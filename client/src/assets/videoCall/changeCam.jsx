@@ -12,23 +12,23 @@ export default function ChangeLocalMediaStream({ peerConnection, localVideo, Cha
         if (ChangeCamOverly) {
             let streamInstance = null
             const setupDevicesAndStream = async () => {
-                const deviceInstance = await getConnectedDevices()
-                setDevices(deviceInstance)
+                try {
+                    const deviceInstance = await getConnectedDevices()
+                    setDevices(deviceInstance)
 
-                streamInstance = await openMediaStream()
-                if (videoPreview.current) videoPreview.current.srcObject = streamInstance
-                setStream(streamInstance)
+                    streamInstance = await openMediaStream()
+                    if (videoPreview.current) videoPreview.current.srcObject = streamInstance
+                    setStream(streamInstance)
+                } catch (error) {
+                    console.error('[ChangeCam] Failed to setup devices/stream:', error.name, error.message)
+                }
             }
 
-            try {
-                setupDevicesAndStream()
-            } catch (error) {
-                console.log("error setting upp devices and stream", error);
-            }
+            setupDevicesAndStream()
 
             return () => {
-                if (streamInstance.getVideoTracks()[0]) {
-                    streamInstance.getVideoTracks()[0].stop()
+                if (streamInstance) {
+                    streamInstance.getTracks().forEach(t => t.stop())
                 }
             }
         }

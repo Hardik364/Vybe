@@ -1,0 +1,45 @@
+export default function Navbar({ strangerUsername, connectionStatus, promptActive, onPromptClick, liveCount }) {
+    return (
+        <nav id="navbar">
+            <div id="nav-logo">
+                <span id="nav-logo-spark">✦</span>
+                RealTalk
+            </div>
+
+            <div id="nav-center">
+                {connectionStatus ? (
+                    <div id="nav-stranger-info">
+                        <span className="online-dot"></span>
+                        <span id="nav-stranger-name">{strangerUsername}</span>
+                    </div>
+                ) : (
+                    <div id="nav-searching">
+                        <div id="nav-loader"></div>
+                        <span>
+                            {strangerUsername
+                                ? 'Connecting...'
+                                : liveCount > 0
+                                    ? `${liveCount} ${liveCount === 1 ? 'person' : 'people'} waiting — finding your match...`
+                                    : 'Finding your match...'}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            <div id="nav-right">
+                <button
+                    id="promptBtn"
+                    className={[
+                        promptActive      ? 'active'   : '',
+                        !connectionStatus ? 'disabled' : '',
+                    ].join(' ').trim()}
+                    onClick={connectionStatus ? onPromptClick : undefined}
+                    title={connectionStatus ? 'Get a conversation prompt' : 'Connect with someone first'}
+                    aria-disabled={!connectionStatus}
+                >
+                    🎲 Prompts
+                </button>
+            </div>
+        </nav>
+    )
+}

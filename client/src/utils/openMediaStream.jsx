@@ -1,12 +1,12 @@
 export default async function openMediaStream(cameraId) {
     const constraints = {
         'video': {
-            deviceId: cameraId || null,
+            ...(cameraId ? { deviceId: { exact: cameraId } } : {}),
             width: { max: 1920 },
             height: { max: 1080 }
         },
         'audio': {
-            echoCancellation: true, 
+            echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
         }
@@ -15,6 +15,7 @@ export default async function openMediaStream(cameraId) {
         const stream = await navigator.mediaDevices.getUserMedia(constraints)
         return stream
     } catch (err) {
-        console.log("err acces local media stream", err)
+        console.error('[openMediaStream] getUserMedia failed:', err.name, err.message)
+        throw err
     }
 }

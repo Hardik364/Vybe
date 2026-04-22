@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 
-export default function Navbar({ strangerUsername, connectionStatus, promptActive, onPromptClick, liveCount, setUsername }) {
+export default function Navbar({ strangerUsername, connectionStatus, promptActive, onPromptClick, liveCount, setUsername, onUpgradeClick, tier }) {
     const navigate = useNavigate()
 
     function handleLogout() {
@@ -37,6 +37,10 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
             </div>
 
             <div id="nav-right">
+                <button id="tierBtn" onClick={onUpgradeClick} title="View plans">
+                    {tier === 'pro' ? '⭐ Pro' : tier === 'plus' ? '💜 Plus' : '🆓 Free'}
+                </button>
+
                 <button
                     id="promptBtn"
                     className={[

@@ -125,16 +125,41 @@ router.post('/verify-otp', async (req, res) => {
 })
 
 // ── GET /auth/me ──────────────────────────────────────────────
-// Validate a stored JWT and return user info
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1]
     if (!token) return res.status(401).json({ error: 'No token' })
 
     try {
-        const user = jwt.verify(token, process.env.JWT_SECRET)
-        res.json({ valid: true, username: user.username, email: user.email, collegeDomain: user.collegeDomain })
+        const user  = jwt.verify(token, process.env.JWT_SECRET)
+        const tier  = await client.get(`tier:${user.email}`) || 'free'
+        res.json({ valid: true, username: user.username, email: user.email, collegeDomain: user.collegeDomain, tier })
     } catch {
         res.status(401).json({ valid: false, error: 'Token expired or invalid' })
+    }
+})
+
+// ── POST /auth/set-tier ────────────────────────────────────────
+// Internal endpoint — called by Razorpay webhook when payment confirmed
+// Protected by a shared webhook secret (not JWT)
+router.post('/set-tier', async (req, res) => {
+    const { email, tier, secret } = req.body
+    if (secret !== process.env.WEBHOOK_SECRET) {
+        return res.status(403).json({ error: 'Forbidden' })
+    }
+    if (!['free', 'plus', 'pro'].includes(tier)) {
+        return res.status(400).json({ error: 'Invalid tier' })
+    }
+    try {
+        if (tier === 'free') {
+            await client.del(`tier:${email}`)
+        } else {
+            // 30-day TTL — subscription expires automatically
+            await client.setEx(`tier:${email}`, 30 * 24 * 60 * 60, tier)
+        }
+        console.log(`[Tier] ${email} → ${tier}`)
+        res.json({ success: true })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
     }
 })
 

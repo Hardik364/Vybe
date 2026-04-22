@@ -1,11 +1,12 @@
 import client from "../redisClient.js";
 import makePair from "./makePair.js";
-import addUserTODb, { getQueueKey } from "./addUserToDb.js";
+import addUserTODb from "./addUserToDb.js";
+import { getSelfQueue } from "../utils/tierMatching.js";
 
-// Broadcast waiting count for this socket's college to everyone in that waiting room
+// Broadcast waiting count for this socket's college queue
 export async function emitLiveCount(io, socket) {
     try {
-        const queueKey = getQueueKey(socket)
+        const queueKey = getSelfQueue(socket)
         const count    = await client.lLen(queueKey)
         const room     = `waiting:${socket.collegeDomain || 'global'}`
         io.to(room).emit('liveCount', count)
@@ -16,7 +17,7 @@ export async function emitLiveCount(io, socket) {
 
 export async function processUserPairing(io, socket) {
     try {
-        // Check if email is banned
+        // Block banned accounts
         if (socket.email) {
             const banned = await client.sIsMember('banned:emails', socket.email)
             if (banned) {
@@ -26,24 +27,21 @@ export async function processUserPairing(io, socket) {
             }
         }
 
-        const queueKey = getQueueKey(socket)
-        const userLen  = await client.lLen(queueKey)
-        const room     = `waiting:${socket.collegeDomain || 'global'}`
+        // Try to find a match across tier-appropriate queues
+        const userPair = await makePair(socket)
 
-        if (userLen <= 0) {
-            // Nobody waiting — add self to queue
-            const check = await soloUserLeftTheChat(socket)
-            if (check > 0) throw new Error("duplicate user in queue: " + socket.username)
-
+        if (!userPair) {
+            // Nobody available — add self to waiting queue
+            await soloUserLeftTheChat(socket)   // clean up stale entry first
             await addUserTODb(socket)
+
+            const room = `waiting:${socket.collegeDomain || 'global'}`
             socket.join(room)
             io.to(socket.id).emit("waiting", "Waiting for another user to join")
             emitLiveCount(io, socket)
         } else {
-            // Someone waiting — make a pair
-            const userPair = await makePair(userLen, socket)
-            if (!userPair) throw new Error("error selecting pair: " + socket.username)
-
+            // Paired — notify both sockets
+            const room = `waiting:${socket.collegeDomain || 'global'}`
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
                 if (s) s.leave(room)
@@ -59,13 +57,14 @@ export async function processUserPairing(io, socket) {
 
 export async function soloUserLeftTheChat(socket) {
     try {
-        const queueKey = getQueueKey(socket)
+        const queueKey = getSelfQueue(socket)
         const check    = await client.lRem(queueKey, 1, JSON.stringify({
             socketId:      socket.id,
             username:      socket.username,
             collegeDomain: socket.collegeDomain || 'global',
+            tier:          socket.tier || 'free',
         }))
-        console.log(`[Queue] ${socket.username} removed from ${queueKey}:`, check)
+        if (check > 0) console.log(`[Queue] ${socket.username} removed from ${queueKey}`)
         return check
     } catch (err) {
         console.error('[soloUserLeftTheChat]', err)

@@ -409,6 +409,22 @@ input  { font-family: inherit; }
     pointer-events: none;
 }
 
+#tierBtn {
+    background: rgba(108,99,255,0.08);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: var(--r-sm);
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all var(--t-fast);
+}
+#tierBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(108,99,255,0.14);
+}
+
 #logoutBtn {
     background: none;
     border: 1px solid var(--border);
@@ -940,6 +956,206 @@ input  { font-family: inherit; }
 
 /* ============================================================
    KARMA MODAL
+   ============================================================ */
+
+/* ============================================================
+   UPGRADE MODAL
+   ============================================================ */
+
+#upgradeOverlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+    backdrop-filter: blur(6px);
+}
+
+#upgradeModal {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    padding: 32px;
+    width: 100%;
+    max-width: 780px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+
+#upgrade-header {
+    position: relative;
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+#upgrade-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+#upgrade-subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+#upgrade-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    padding: 4px 8px;
+    border-radius: var(--r-sm);
+    transition: color var(--t-fast);
+}
+#upgrade-close:hover { color: var(--text-primary); }
+
+#upgrade-tiers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.upgrade-card {
+    position: relative;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color var(--t-base);
+}
+
+.upgrade-card.current {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.06);
+}
+
+.upgrade-card.featured {
+    border-color: var(--accent);
+}
+
+.tier-popular-badge, .tier-current-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+}
+
+.tier-popular-badge {
+    background: var(--accent);
+    color: white;
+}
+
+.tier-current-badge {
+    background: var(--green);
+    color: white;
+}
+
+.tier-name {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.tier-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.tier-price-amount {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.tier-price-period {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.tier-scope {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.tier-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    flex: 1;
+}
+
+.tier-feature {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.tier-check {
+    color: var(--green);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.tier-cta {
+    margin-top: 8px;
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--r-md);
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    transition: all var(--t-fast);
+}
+
+.tier-cta.active-plan {
+    background: rgba(34,197,94,0.15);
+    color: var(--green);
+    cursor: default;
+}
+
+.tier-cta.coming-soon {
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    cursor: not-allowed;
+}
+
+#upgrade-note {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+    #upgrade-tiers { grid-template-columns: 1fr; }
+    #upgradeModal  { padding: 20px 16px; }
+}
+
+/* ============================================================
+   KARMA OVERLAY
    ============================================================ */
 
 #karmaOverlay {

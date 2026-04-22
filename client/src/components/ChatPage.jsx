@@ -11,6 +11,7 @@ import Navbar from '../assets/ui/Navbar'
 import PromptCard from '../assets/ui/PromptCard'
 import PostCallScreen from '../assets/ui/PostCallScreen'
 import KarmaModal from '../assets/ui/KarmaModal'
+import UpgradeModal from '../assets/ui/UpgradeModal'
 
 export default function ChatPage({ username, setUsername }) {
     // Core state
@@ -35,6 +36,10 @@ export default function ChatPage({ username, setUsername }) {
 
     // Phase 5: report
     const [reportSent, setReportSent]         = useState(false)
+
+    // Phase 6: tier
+    const [showUpgrade, setShowUpgrade]       = useState(false)
+    const [userTier,    setUserTier]          = useState('free')
 
     const localVideo  = useRef(null)
     const remoteVideo = useRef(null)
@@ -69,6 +74,18 @@ export default function ChatPage({ username, setUsername }) {
         socket.on('liveCount', (count) => setLiveCount(count))
         return () => socket.off('liveCount')
     }, [socket])
+
+    // ── Phase 6: load tier ───────────────────────────────────
+    useEffect(() => {
+        const token = localStorage.getItem('rt_token')
+        if (!token) return
+        fetch(`${import.meta.env.VITE_APP_WEBSOCKET_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(r => r.json())
+            .then(d => { if (d.valid && d.tier) setUserTier(d.tier) })
+            .catch(() => {})
+    }, [])
 
     // ── Prompt handlers ──────────────────────────────────────
     function handlePromptToggle() {
@@ -133,6 +150,8 @@ export default function ChatPage({ username, setUsername }) {
                 onPromptClick={handlePromptToggle}
                 liveCount={liveCount}
                 setUsername={setUsername}
+                tier={userTier}
+                onUpgradeClick={() => setShowUpgrade(true)}
             />
 
             <div id="chatPage">
@@ -223,6 +242,13 @@ export default function ChatPage({ username, setUsername }) {
                     strangerUserId={lastStrangerUserId || strangerUserId}
                     socket={socket}
                     onRate={handleKarmaRate}
+                />
+            )}
+
+            {showUpgrade && (
+                <UpgradeModal
+                    currentTier={userTier}
+                    onClose={() => setShowUpgrade(false)}
                 />
             )}
         </div>

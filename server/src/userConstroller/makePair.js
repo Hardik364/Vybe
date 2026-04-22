@@ -1,58 +1,54 @@
 import client from "../redisClient.js";
-import addUserTODb, { getQueueKey } from "./addUserToDb.js";
+import addUserTODb from "./addUserToDb.js";
+import { getMatchQueues, getSelfQueue } from "../utils/tierMatching.js";
 
 function createUserPair(socket, randomUserData) {
-    const user1 = {
-        socketId:        socket.id,
-        username:        socket.username,
-        polite:          true,
-        pairedUserId:    randomUserData.socketId,
-        strangerUsername: randomUserData.username,
-    };
-    const user2 = {
-        socketId:        randomUserData.socketId,
-        username:        randomUserData.username,
-        polite:          false,
-        pairedUserId:    socket.id,
-        strangerUsername: socket.username,
-    };
-    return [user1, user2];
+    return [
+        {
+            socketId:        socket.id,
+            username:        socket.username,
+            polite:          true,
+            pairedUserId:    randomUserData.socketId,
+            strangerUsername: randomUserData.username,
+        },
+        {
+            socketId:        randomUserData.socketId,
+            username:        randomUserData.username,
+            polite:          false,
+            pairedUserId:    socket.id,
+            strangerUsername: socket.username,
+        },
+    ]
 }
 
-export default async function makePair(len, socket) {
-    const queueKey       = getQueueKey(socket)
-    const getRandomIndex = () => Math.floor(Math.random() * len)
+export default async function makePair(socket) {
+    // Try each queue in tier-priority order
+    const queues = getMatchQueues(socket)
 
-    try {
-        const strangerIndex  = getRandomIndex()
-        const randomUserData = await client.lIndex(queueKey, strangerIndex)
+    for (const queueKey of queues) {
+        const len = await client.lLen(queueKey)
+        if (len <= 0) continue
 
-        if (!randomUserData) {
-            socket.emit("errMakingPair", "No user found")
-            return null
+        const randomIndex    = Math.floor(Math.random() * len)
+        const rawUserData    = await client.lIndex(queueKey, randomIndex)
+        if (!rawUserData) continue
+
+        const removedCount = await client.lRem(queueKey, 1, rawUserData)
+        if (removedCount === 0) continue   // race condition — someone else grabbed them
+
+        const parsedUserData = JSON.parse(rawUserData)
+
+        // Don't pair with self
+        if (parsedUserData.socketId === socket.id) {
+            // Put them back and keep searching
+            await client.rPush(queueKey, rawUserData)
+            continue
         }
 
-        const removedCount = await client.lRem(queueKey, 1, randomUserData)
-        if (removedCount === 0) {
-            socket.emit("errMakingPair", "User no longer available")
-            return null
-        }
-
-        const parsedUserData = JSON.parse(randomUserData)
-        const users          = createUserPair(socket, parsedUserData)
+        const users = createUserPair(socket, parsedUserData)
         console.log(`[Pair] ${users[0].username} ↔ ${users[1].username} (queue: ${queueKey})`)
-
-        if (users[0].socketId === users[1].socketId) {
-            socket.emit("waiting", "Waiting for another user to join")
-            addUserTODb(socket)
-            return null
-        }
-
         return users
-
-    } catch (err) {
-        console.error('[makePair]', err)
-        socket.emit("errMakingPair", "Internal server error")
-        return null
     }
+
+    return null   // nobody available in any queue
 }

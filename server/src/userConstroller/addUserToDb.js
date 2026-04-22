@@ -1,25 +1,28 @@
 import client from "../redisClient.js";
-
-// Returns the correct Redis queue key for this socket
-export function getQueueKey(socket, forceShadow = false) {
-    const domain = socket.collegeDomain || 'global'
-    const shadow  = forceShadow || socket.shadowBanned
-    return shadow ? `users:shadow:${domain}` : `users:${domain}`
-}
+import { getSelfQueue } from "../utils/tierMatching.js";
 
 export default async function addUserTODb(socket) {
     try {
-        // Check if this user is shadow-banned
+        // Check shadow ban status and attach to socket
         const isShadowBanned = await client.sIsMember('shadowBanned', socket.id)
         socket.shadowBanned  = isShadowBanned
 
-        const queueKey = getQueueKey(socket)
+        // Get tier from Redis (set when user upgrades; default = 'free')
+        if (socket.email) {
+            const tier = await client.get(`tier:${socket.email}`)
+            socket.tier = tier || 'free'
+        } else {
+            socket.tier = 'free'
+        }
+
+        const queueKey = getSelfQueue(socket)
         const result   = await client.rPush(queueKey, JSON.stringify({
-            socketId: socket.id,
-            username: socket.username,
+            socketId:      socket.id,
+            username:      socket.username,
             collegeDomain: socket.collegeDomain || 'global',
+            tier:          socket.tier,
         }))
-        console.log(`[Queue] Added ${socket.username} → ${queueKey} (len=${result})`)
+        console.log(`[Queue] ${socket.username} (${socket.tier}) → ${queueKey} (len=${result})`)
     } catch (err) {
         console.error('[addUserTODb]', err)
         socket.emit("errSelectingPair")

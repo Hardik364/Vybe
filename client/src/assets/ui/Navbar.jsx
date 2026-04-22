@@ -37,10 +37,6 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
             </div>
 
             <div id="nav-right">
-                <button id="tierBtn" onClick={onUpgradeClick} title="View plans">
-                    {tier === 'pro' ? '⭐ Pro' : tier === 'plus' ? '💜 Plus' : '🆓 Free'}
-                </button>
-
                 <button
                     id="promptBtn"
                     className={[

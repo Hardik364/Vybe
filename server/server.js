@@ -2,15 +2,24 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import client from "./src/redisClient.js";
 import { handelSocketConnection } from "./src/socketRoutes.js";
 import authRoutes from "./src/authRoutes.js";
 import 'dotenv/config'
 
 const app = express();
-app.use(express.json())
 
-// Allow frontend origin (strip trailing slash if any)
+// ── Security headers ─────────────────────────────────────────
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,   // needed for WebRTC
+  contentSecurityPolicy: false,        // handled by Vite in prod
+}))
+
+app.use(express.json({ limit: '16kb' }))  // prevent large payload attacks
+
+// ── CORS ─────────────────────────────────────────────────────
 const frontendOrigin = (process.env.PUBLIC_WEBSOCKET_URL || 'http://localhost:5173').replace(/\/$/, '')
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', frontendOrigin)
@@ -20,45 +29,71 @@ app.use((req, res, next) => {
   next()
 })
 
+// ── Rate limiting ─────────────────────────────────────────────
+// General API: 100 requests per 15 minutes per IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+})
+
+// Auth endpoints: stricter — 10 per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, please try again later.' }
+})
+
+app.use('/api', generalLimiter)
+app.use('/auth', authLimiter)
+
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.PUBLIC_WEBSOCKET_URL || "http://localhost:5173"
-  }
-});
+  cors: { origin: frontendOrigin },
+  // Limit Socket.IO payload size
+  maxHttpBufferSize: 1e5,  // 100 KB
+  pingTimeout: 20000,
+  pingInterval: 10000,
+})
 
 // ── Socket.IO auth middleware ─────────────────────────────────
 io.use((socket, next) => {
   const token    = socket.handshake.auth.token
   const username = socket.handshake.auth.username
 
-  // If JWT token provided → verify it
   if (token) {
     try {
-      const user = jwt.verify(token, process.env.JWT_SECRET)
-      socket.username     = user.username
-      socket.email        = user.email
+      const user           = jwt.verify(token, process.env.JWT_SECRET)
+      socket.username      = user.username
+      socket.email         = user.email
       socket.collegeDomain = user.collegeDomain
       return next()
     } catch {
-      // Token invalid/expired — still allow with plain username in dev
       if (process.env.NODE_ENV === 'production') {
         return next(new Error('Invalid or expired token'))
       }
     }
   }
 
-  // Fallback: plain username (dev mode / not yet verified)
   if (!username) return next(new Error("invalid username"))
   socket.username = username
   next()
 })
 
+// ── Redis connection ──────────────────────────────────────────
 client.connect()
-  .then(() => console.log("database connected"))
-  .catch(err => console.log("error connecting db", err))
+  .then(() => console.log("✅ Redis connected"))
+  .catch(err => {
+    console.error("❌ Redis connection failed:", err)
+    process.exit(1)
+  })
 
+// ── Socket.IO ────────────────────────────────────────────────
 io.on("connection", (socket) => {
   handelSocketConnection(io, socket)
 })
@@ -66,20 +101,24 @@ io.on("connection", (socket) => {
 // ── Routes ───────────────────────────────────────────────────
 app.use('/auth', authRoutes)
 
-// Traffic stats endpoint
+// Stats — protect with a simple token in production
 app.get('/stats', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    const key = req.headers['x-stats-key']
+    if (key !== process.env.STATS_KEY) return res.status(403).json({ error: 'Forbidden' })
+  }
   try {
     const connectedSockets = io.engine.clientsCount
-    const waitingUsers     = await client.lLen('users')
-    const activePairs      = Math.floor((connectedSockets - waitingUsers) / 2)
     const shadowBanned     = await client.sCard('shadowBanned')
+    const suspended        = await client.sCard('suspended')
+    const bannedEmails     = await client.sCard('banned:emails')
 
     res.json({
       live: {
         connected:    connectedSockets,
-        waiting:      waitingUsers,
-        activeCalls:  activePairs,
-        shadowBanned: shadowBanned,
+        shadowBanned,
+        suspended,
+        bannedEmails,
       },
       server: {
         uptime:  `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`,
@@ -93,4 +132,30 @@ app.get('/stats', async (req, res) => {
   }
 })
 
-httpServer.listen(process.env.PORT, () => console.log("port running at", process.env.PORT))
+// 404 handler
+app.use((req, res) => res.status(404).json({ error: 'Not found' }))
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[Express Error]', err)
+  res.status(500).json({ error: 'Internal server error' })
+})
+
+// ── Start ─────────────────────────────────────────────────────
+const PORT = process.env.PORT || 3000
+httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
+
+// ── Graceful shutdown ─────────────────────────────────────────
+async function shutdown(signal) {
+  console.log(`\n[${signal}] Shutting down gracefully...`)
+  httpServer.close(async () => {
+    await client.quit()
+    console.log('✅ Clean shutdown complete')
+    process.exit(0)
+  })
+  // Force exit after 10s
+  setTimeout(() => process.exit(1), 10000)
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT',  () => shutdown('SIGINT'))

@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import openMediaStream from "../../utils/openMediaStream"
+
+const CONSENT_TIMEOUT_MS = 10000  // 10 seconds — reset if partner doesn't respond
 
 export default function LocalVideo({
     localVideo, peerConnection, setChangeCamOverly, setStream, stream,
     selectedDeviceId, socket, strangerUserId
 }) {
-    const [videoEnabled, setVideoEnabled]       = useState(false)
+    const [videoEnabled,      setVideoEnabled]      = useState(false)
     const [partnerWantsVideo, setPartnerWantsVideo] = useState(false)
+    const [consentPending,    setConsentPending]    = useState(false) // waiting for partner
+    const consentTimerRef = useRef(null)
 
     // ── Open media stream: audio-only by default ─────────────
     useEffect(() => {
@@ -15,13 +19,9 @@ export default function LocalVideo({
             async function handelMediaStream() {
                 try {
                     streamInstance = await openMediaStream(selectedDeviceId)
-
                     // Voice-first: disable video track immediately
                     streamInstance.getVideoTracks().forEach(t => { t.enabled = false })
-
-                    if (localVideo.current) {
-                        localVideo.current.srcObject = streamInstance
-                    }
+                    if (localVideo.current) localVideo.current.srcObject = streamInstance
                     setStream(streamInstance)
                     setVideoEnabled(false)
                 } catch (err) {
@@ -42,24 +42,32 @@ export default function LocalVideo({
     // ── Listen for partner video consent events ──────────────
     useEffect(() => {
         if (!socket) return
-        socket.on('partnerWantsVideo',   () => setPartnerWantsVideo(true))
+
+        socket.on('partnerWantsVideo', () => setPartnerWantsVideo(true))
+
         socket.on('partnerTurnedOffVideo', () => {
             setPartnerWantsVideo(false)
-            // If partner turns off, we also turn off our display
         })
-        socket.on('videoBothConsented',  () => {
+
+        socket.on('videoBothConsented', () => {
             // Both consented — enable video track
+            clearConsentTimer()
+            setConsentPending(false)
             if (stream) {
                 stream.getVideoTracks().forEach(t => { t.enabled = true })
                 setVideoEnabled(true)
             }
         })
+
         socket.on('videoDisabled', () => {
+            clearConsentTimer()
+            setConsentPending(false)
             if (stream) {
                 stream.getVideoTracks().forEach(t => { t.enabled = false })
                 setVideoEnabled(false)
             }
         })
+
         return () => {
             socket.off('partnerWantsVideo')
             socket.off('partnerTurnedOffVideo')
@@ -70,24 +78,56 @@ export default function LocalVideo({
 
     // Reset video consent when partner changes
     useEffect(() => {
+        clearConsentTimer()
         setVideoEnabled(false)
         setPartnerWantsVideo(false)
+        setConsentPending(false)
         if (stream) stream.getVideoTracks().forEach(t => { t.enabled = false })
     }, [strangerUserId])
 
+    function clearConsentTimer() {
+        if (consentTimerRef.current) {
+            clearTimeout(consentTimerRef.current)
+            consentTimerRef.current = null
+        }
+    }
+
     function handleToggleVideo() {
         if (!socket || !strangerUserId) return
+
         if (videoEnabled) {
             // Turn off
             if (stream) stream.getVideoTracks().forEach(t => { t.enabled = false })
             setVideoEnabled(false)
+            setConsentPending(false)
+            clearConsentTimer()
+            socket.emit('videoConsentOff', { to: strangerUserId })
+        } else if (consentPending) {
+            // Cancel pending request
+            setConsentPending(false)
+            clearConsentTimer()
             socket.emit('videoConsentOff', { to: strangerUserId })
         } else {
-            // Request consent
+            // Request consent — start 10s timeout
+            setConsentPending(true)
             socket.emit('videoConsentOn', { to: strangerUserId })
-            // Will be enabled when 'videoBothConsented' fires
+            consentTimerRef.current = setTimeout(() => {
+                // Partner didn't respond in time — reset silently
+                setConsentPending(false)
+                consentTimerRef.current = null
+            }, CONSENT_TIMEOUT_MS)
         }
     }
+
+    // Cleanup timer on unmount
+    useEffect(() => () => clearConsentTimer(), [])
+
+    const btnLabel = (() => {
+        if (videoEnabled)      return '📷 Camera On'
+        if (consentPending)    return '⏳ Waiting… (tap to cancel)'
+        if (partnerWantsVideo) return '✅ They want video — click to go live!'
+        return '📷 Enable Video'
+    })()
 
     return (
         <div id="localVideoWrap">
@@ -100,18 +140,15 @@ export default function LocalVideo({
             <button
                 id="videoConsentBtn"
                 className={[
-                    videoEnabled        ? 'video-on'      : 'video-off',
-                    partnerWantsVideo && !videoEnabled ? 'partner-ready' : '',
+                    videoEnabled                        ? 'video-on'      : 'video-off',
+                    consentPending                      ? 'consent-pending' : '',
+                    partnerWantsVideo && !videoEnabled  ? 'partner-ready' : '',
                 ].join(' ').trim()}
                 onClick={handleToggleVideo}
                 title={videoEnabled ? 'Turn off camera' : 'Enable camera (both must agree)'}
                 disabled={!strangerUserId}
             >
-                {videoEnabled
-                    ? '📷 Camera On'
-                    : partnerWantsVideo
-                        ? '✅ They want video — click to go live!'
-                        : '📷 Enable Video'}
+                {btnLabel}
             </button>
         </div>
     )

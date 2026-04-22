@@ -574,6 +574,18 @@ input  { font-family: inherit; }
     animation: pulse-green 1.5s ease-in-out infinite;
 }
 
+#videoConsentBtn.consent-pending {
+    background: rgba(245,158,11,0.15);
+    border-color: var(--amber);
+    color: var(--amber);
+    animation: pulse-amber 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-amber {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+    50%       { box-shadow: 0 0 0 6px rgba(245,158,11,0.2); }
+}
+
 #videoConsentBtn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
@@ -992,6 +1004,153 @@ input  { font-family: inherit; }
     border: 1px solid rgba(228,64,95,0.3);
 }
 .contact-instagram:hover { background: rgba(228,64,95,0.22); }
+
+/* ── Contact exchange form (post-call) ── */
+#contact-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 320px;
+    margin-top: 8px;
+}
+
+#contact-type-tabs {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-elevated);
+    border-radius: var(--r-md);
+    padding: 4px;
+}
+
+.contact-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: all var(--t-fast);
+}
+
+.contact-tab.active {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+#contact-input-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    transition: border-color var(--t-fast);
+}
+
+#contact-input-row:focus-within { border-color: var(--accent); }
+
+#contact-prefix {
+    padding: 11px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+    user-select: none;
+    white-space: nowrap;
+}
+
+#contact-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    padding: 11px 12px;
+    outline: none;
+}
+
+#contact-input::placeholder { color: var(--text-muted); }
+
+#contact-submit-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--r-md);
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background var(--t-fast);
+}
+
+#contact-submit-btn:hover:not(:disabled) { background: var(--accent-hover); }
+#contact-submit-btn:disabled             { opacity: 0.45; cursor: not-allowed; }
+
+#contact-privacy-note {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* waiting spinner */
+#contact-waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+#contact-waiting-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* revealed contact link */
+.contact-reveal-link {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 12px 24px;
+    background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background var(--t-fast);
+}
+
+.contact-reveal-link:hover { background: rgba(108,99,255,0.3); }
+
+.contact-btn-done {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: var(--r-md);
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--t-fast);
+    margin-top: 4px;
+}
+
+.contact-btn-done:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
 
 /* ============================================================
    KARMA MODAL
@@ -1707,6 +1866,7 @@ input  { font-family: inherit; }
     display: flex;
     align-items: center;
     gap: 10px;
+    overflow: hidden;
 }
 
 .cm-user-avatar {
@@ -1723,12 +1883,25 @@ input  { font-family: inherit; }
     flex-shrink: 0;
 }
 
+.cm-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
 .cm-user-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cm-user-karma {
+    font-size: 11px;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
@@ -1845,6 +2018,35 @@ input  { font-family: inherit; }
     width: 32px;
     height: 1px;
     flex-shrink: 0;
+}
+
+.cm-report-btn {
+    background: none;
+    border: none;
+    color: transparent;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--r-sm);
+    opacity: 0;
+    transition: opacity var(--t-fast), color var(--t-fast);
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 1px;
+    line-height: 1;
+}
+
+.cm-msg-body:hover .cm-report-btn {
+    opacity: 1;
+    color: var(--text-muted);
+}
+
+.cm-report-btn:hover:not(:disabled) { color: var(--red) !important; }
+
+.cm-report-btn.reported {
+    opacity: 1;
+    color: var(--red);
+    cursor: default;
 }
 
 .cm-msg-text {
@@ -2052,6 +2254,40 @@ input  { font-family: inherit; }
 .cm-btn-ghost:hover {
     background: var(--bg-elevated);
     color: var(--text-primary);
+}
+
+/* ── Typing indicator ── */
+.cm-typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 20px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    min-height: 20px;
+    flex-shrink: 0;
+}
+
+.cm-typing-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.cm-typing-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: cm-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.cm-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cm-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes cm-dot-bounce {
+    0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+    30%            { transform: translateY(-4px); opacity: 1;   }
 }
 
 /* ── Toast notification ── */

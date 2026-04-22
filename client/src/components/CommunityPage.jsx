@@ -100,6 +100,12 @@ export default function CommunityPage({ username: propUsername }) {
     const [guestName,   setGuestName]   = useState('')
     const [showGuest,   setShowGuest]   = useState(!username)
     const [toast,       setToast]       = useState(null) // { text, type: 'error'|'warn' }
+    const [typers,      setTypers]      = useState([])   // usernames currently typing
+    const [reported,    setReported]    = useState(new Set()) // messageIds already reported
+    const [karma,       setKarma]       = useState(null)  // { great, okay, disrespectful, total }
+
+    const typingTimerRef = useRef(null)
+    const isTypingRef    = useRef(false)
 
     const socketRef  = useRef(null)
     const bottomRef  = useRef(null)
@@ -150,6 +156,28 @@ export default function CommunityPage({ username: propUsername }) {
             }
         })
 
+        sock.on('channel:typing', ({ channelId, username }) => {
+            if (channelId !== activeId) return
+            setTypers(prev => prev.includes(username) ? prev : [...prev, username])
+        })
+
+        sock.on('channel:stopTyping', ({ channelId, username }) => {
+            if (channelId !== activeId) return
+            setTypers(prev => prev.filter(u => u !== username))
+        })
+
+        sock.on('connect', () => {
+            // Fetch own karma once connected (socket id is stable per session)
+            fetch(`${API}/community/karma/${sock.id}`)
+                .then(r => r.json())
+                .then(k => { if (k && !k.error) setKarma(k) })
+                .catch(() => {})
+        })
+
+        sock.on('channel:reportAck', ({ messageId }) => {
+            setReported(prev => new Set([...prev, messageId]))
+        })
+
         sock.on('channel:rateLimited', ({ message }) => {
             showToast(message || 'Slow down! Too many messages.', 'warn')
         })
@@ -197,6 +225,9 @@ export default function CommunityPage({ username: propUsername }) {
         // Join new channel
         socketRef.current.emit('channel:join', { channelId: activeId })
 
+        // Clear typers from previous channel
+        setTypers([])
+
         // Load history
         fetch(`${API}/community/channels/${activeId}/messages`)
             .then(r => r.json())
@@ -209,11 +240,43 @@ export default function CommunityPage({ username: propUsername }) {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
+    // ── Report message ───────────────────────────────────────
+    function reportMessage(msg) {
+        if (!socketRef.current || reported.has(msg.id)) return
+        socketRef.current.emit('channel:report_message', {
+            channelId: msg.channelId,
+            messageId: msg.id,
+            author:    msg.author,
+        })
+        // Optimistic update
+        setReported(prev => new Set([...prev, msg.id]))
+        showToast('Message reported. Thanks for keeping the community safe.', 'warn')
+    }
+
+    // ── Typing events ────────────────────────────────────────
+    function handleInputChange(e) {
+        setInput(e.target.value)
+        if (!socketRef.current || !activeId) return
+        if (!isTypingRef.current) {
+            isTypingRef.current = true
+            socketRef.current.emit('channel:typing', { channelId: activeId })
+        }
+        clearTimeout(typingTimerRef.current)
+        typingTimerRef.current = setTimeout(() => {
+            isTypingRef.current = false
+            socketRef.current?.emit('channel:stopTyping', { channelId: activeId })
+        }, 2000)
+    }
+
     // ── Send message ─────────────────────────────────────────
     function sendMessage(e) {
         e.preventDefault()
         const text = input.trim()
         if (!text || !activeId || !socketRef.current) return
+        // Stop typing indicator immediately on send
+        isTypingRef.current = false
+        clearTimeout(typingTimerRef.current)
+        socketRef.current.emit('channel:stopTyping', { channelId: activeId })
         socketRef.current.emit('channel:message', { channelId: activeId, content: text })
         setInput('')
     }
@@ -292,7 +355,18 @@ export default function CommunityPage({ username: propUsername }) {
                 <div className="cm-sidebar-footer">
                     <div className="cm-user-info">
                         <div className="cm-user-avatar">{username?.[0]?.toUpperCase()}</div>
-                        <span className="cm-user-name">{username}</span>
+                        <div className="cm-user-details">
+                            <span className="cm-user-name">{username}</span>
+                            {karma && karma.total > 0 && (
+                                <span className="cm-user-karma" title={`${karma.great} great · ${karma.okay} okay · ${karma.disrespectful} disrespectful`}>
+                                    {karma.disrespectful / karma.total > 0.2
+                                        ? '⚠️ Low karma'
+                                        : karma.great / karma.total > 0.6
+                                            ? '⭐ Great karma'
+                                            : '👍 Good karma'}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -342,12 +416,36 @@ export default function CommunityPage({ username: propUsername }) {
                                     <div className="cm-msg-body">
                                         {!isFirst && <span className="cm-msg-gap-avatar" />}
                                         <p className="cm-msg-text">{msg.content}</p>
+                                        {msg.author !== username && (
+                                            <button
+                                                className={`cm-report-btn${reported.has(msg.id) ? ' reported' : ''}`}
+                                                onClick={() => reportMessage(msg)}
+                                                title={reported.has(msg.id) ? 'Reported' : 'Report message'}
+                                                disabled={reported.has(msg.id)}
+                                            >
+                                                {reported.has(msg.id) ? '🚩' : '⚑'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )
                         })}
                         <div ref={bottomRef} />
                     </div>
+
+                    {/* Typing indicator */}
+                    {typers.length > 0 && (
+                        <div className="cm-typing-indicator">
+                            <span className="cm-typing-dots"><span/><span/><span/></span>
+                            <span className="cm-typing-text">
+                                {typers.length === 1
+                                    ? `${typers[0]} is typing…`
+                                    : typers.length === 2
+                                        ? `${typers[0]} and ${typers[1]} are typing…`
+                                        : 'Several people are typing…'}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Rate limit / error toast */}
                     {toast && (
@@ -360,7 +458,7 @@ export default function CommunityPage({ username: propUsername }) {
                     <form className="cm-input-row" onSubmit={sendMessage}>
                         <input
                             value={input}
-                            onChange={e => setInput(e.target.value)}
+                            onChange={handleInputChange}
                             placeholder={`Message #${activeChannel.name}`}
                             className="cm-input"
                             maxLength={500}

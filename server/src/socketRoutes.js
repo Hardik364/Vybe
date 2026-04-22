@@ -157,6 +157,30 @@ export function handelSocketConnection(io, socket) {
         }
     })
 
+    // ── Contact share (after Connect 🤝 mutual press) ─────────
+    // Each user submits their contact; server relays to the other only when both have submitted
+    const contactSubmissions = new Map() // roomKey → { [socketId]: contactInfo }
+    socket.on('submitContact', ({ to, contact }) => {
+        if (!to || !contact?.trim()) return
+        // Verify they were actually paired
+        if (!werePartnered(socket.id, to)) return
+
+        const roomKey = [socket.id, to].sort().join(':')
+        if (!contactSubmissions.has(roomKey)) contactSubmissions.set(roomKey, {})
+        const room = contactSubmissions.get(roomKey)
+        room[socket.id] = contact.trim().slice(0, 100)
+
+        if (room[socket.id] && room[to]) {
+            // Both submitted — exchange and clean up
+            io.to(socket.id).emit('contactRevealed', { contact: room[to] })
+            io.to(to).emit('contactRevealed', { contact: room[socket.id] })
+            contactSubmissions.delete(roomKey)
+        } else {
+            // Tell sender we're waiting for the other person
+            socket.emit('contactSubmitted')
+        }
+    })
+
     socket.on('cancelConnect', () => {
         if (pendingConnects.has(socket.id)) {
             clearTimeout(pendingConnects.get(socket.id).timer)
@@ -273,6 +297,23 @@ export function handelSocketConnection(io, socket) {
         }
     })
 
+    // Typing indicator — broadcast to channel, exclude sender
+    socket.on('channel:typing', ({ channelId }) => {
+        if (!channelId) return
+        socket.to(`ch:${channelId}`).emit('channel:typing', {
+            channelId,
+            username: socket.username || 'someone',
+        })
+    })
+
+    socket.on('channel:stopTyping', ({ channelId }) => {
+        if (!channelId) return
+        socket.to(`ch:${channelId}`).emit('channel:stopTyping', {
+            channelId,
+            username: socket.username || 'someone',
+        })
+    })
+
     socket.on('channel:message', async ({ channelId, content }) => {
         if (!channelId || !content?.trim()) return
 
@@ -302,6 +343,21 @@ export function handelSocketConnection(io, socket) {
         } catch (err) {
             console.error('[channel:message]', err)
             socket.emit('channel:error', { message: 'Failed to send message. Please try again.' })
+        }
+    })
+
+    // ── Report a community message ────────────────────────────
+    socket.on('channel:report_message', async ({ channelId, messageId, author }) => {
+        if (!channelId || !messageId) return
+        try {
+            const key = `ch:report:${messageId}`
+            await client.zAdd(key, { score: Date.now(), value: socket.id }, { NX: true })
+            await client.expire(key, 7 * 24 * 60 * 60) // keep reports for 7 days
+            const count = await client.zCard(key)
+            console.log(`[ChannelReport] msg=${messageId} ch=${channelId} author=${author} total=${count}`)
+            socket.emit('channel:reportAck', { messageId })
+        } catch (err) {
+            console.error('[channel:report_message]', err)
         }
     })
 

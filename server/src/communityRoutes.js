@@ -98,4 +98,21 @@ router.get('/channels/:id/messages', async (req, res) => {
     }
 })
 
+// ── GET /community/karma/:socketId ───────────────────────────
+// Public — only aggregated counts, no PII. Used to show a user their own karma.
+router.get('/karma/:socketId', async (req, res) => {
+    try {
+        const raw = await client.hGetAll(`karma:${req.params.socketId}`)
+        if (!raw || !raw.total) return res.json({ total: 0, great: 0, okay: 0, disrespectful: 0 })
+        res.json({
+            total:         parseInt(raw.total         || 0),
+            great:         parseInt(raw.great         || 0),
+            okay:          parseInt(raw.okay          || 0),
+            disrespectful: parseInt(raw.disrespectful || 0),
+        })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+})
+
 export default router

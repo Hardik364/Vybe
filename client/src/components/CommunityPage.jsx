@@ -163,8 +163,9 @@ export default function CommunityPage({ username: propUsername }) {
         fetch(`${API}/community/channels`)
             .then(r => r.json())
             .then(list => {
-                setChannels(list)
-                if (!activeId && list.length) setActiveId(list[0].id)
+                const arr = Array.isArray(list) ? list : []
+                setChannels(arr)
+                if (!activeId && arr.length) setActiveId(arr[0].id)
             })
             .catch(console.error)
     }, [])
@@ -207,7 +208,12 @@ export default function CommunityPage({ username: propUsername }) {
         // Refresh channel list
         fetch(`${API}/community/channels`)
             .then(r => r.json())
-            .then(list => { setChannels(list); setActiveId(newId) })
+            .then(list => {
+                const arr = Array.isArray(list) ? list : []
+                setChannels(arr)
+                setActiveId(newId)
+            })
+            .catch(console.error)
     }
 
     // ── Guest name prompt ────────────────────────────────────

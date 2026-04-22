@@ -1,5 +1,6 @@
 import { processUserPairing, soloUserLeftTheChat, emitLiveCount } from "./userConstroller/userController.js"
 import { registerUser, updateStatus, removeUser } from "./userRegistry.js"
+import { werePartnered, cleanupPartnership } from "./partnerships.js"
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -14,11 +15,46 @@ function pickPrompt(excludeId = null) {
     return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// Track pending Connect requests: socketId → { partnerId, timer }
+// ── Track pending Connect requests: socketId → { partnerId, timer }
 const pendingConnects = new Map()
 
-// Track video consent: socketId → Set of consenting socket IDs
+// ── Track video consent: socketId → Set of consenting socket IDs
 const videoConsents   = new Map()
+
+// ── Per-socket rate limiter ───────────────────────────────────────────────────
+// limits: Map of event name → { windowMs, max }
+const RATE_LIMITS = {
+    'channel:message': { windowMs: 3000,  max: 5  },  // 5 msgs per 3 sec
+    'reportUser':      { windowMs: 60000, max: 3  },  // 3 reports per min
+    'rateUser':        { windowMs: 60000, max: 10 },  // 10 ratings per min
+    'private message': { windowMs: 1000,  max: 10 },  // 10 msgs per sec
+}
+
+// socketId → Map<eventName, { count, resetAt }>
+const rateLimitState = new Map()
+
+function isRateLimited(socketId, event) {
+    const limit = RATE_LIMITS[event]
+    if (!limit) return false
+
+    if (!rateLimitState.has(socketId)) rateLimitState.set(socketId, new Map())
+    const socketLimits = rateLimitState.get(socketId)
+
+    const now = Date.now()
+    if (!socketLimits.has(event) || now > socketLimits.get(event).resetAt) {
+        socketLimits.set(event, { count: 1, resetAt: now + limit.windowMs })
+        return false
+    }
+
+    const state = socketLimits.get(event)
+    if (state.count >= limit.max) return true
+    state.count++
+    return false
+}
+
+function cleanupRateLimit(socketId) {
+    rateLimitState.delete(socketId)
+}
 
 export function handelSocketConnection(io, socket) {
 
@@ -51,6 +87,7 @@ export function handelSocketConnection(io, socket) {
 
     // ── Text chat ────────────────────────────────────────────
     socket.on("private message", ({ content, to }) => {
+        if (isRateLimited(socket.id, 'private message')) return
         io.to(to).emit("private message", { content, from: socket.id })
     })
 
@@ -77,17 +114,27 @@ export function handelSocketConnection(io, socket) {
         if (!videoConsents.has(to)) videoConsents.set(to, new Set())
         videoConsents.get(to).add(socket.id)
         io.to(to).emit('partnerWantsVideo')
+
         const partnerConsents = videoConsents.get(socket.id)
         if (partnerConsents && partnerConsents.has(to)) {
             io.to(socket.id).emit('videoBothConsented')
             io.to(to).emit('videoBothConsented')
-            videoConsents.delete(socket.id)
-            videoConsents.delete(to)
+            // Clean up both entries fully
+            videoConsents.get(socket.id)?.delete(to)
+            videoConsents.get(to)?.delete(socket.id)
+            if (!videoConsents.get(socket.id)?.size) videoConsents.delete(socket.id)
+            if (!videoConsents.get(to)?.size)        videoConsents.delete(to)
         }
     })
 
     socket.on('videoConsentOff', ({ to }) => {
-        if (videoConsents.has(to)) videoConsents.get(to).delete(socket.id)
+        // Clean up: remove socket.id from to's consent Set
+        videoConsents.get(to)?.delete(socket.id)
+        if (!videoConsents.get(to)?.size) videoConsents.delete(to)
+        // Also remove to from socket.id's consent Set
+        videoConsents.get(socket.id)?.delete(to)
+        if (!videoConsents.get(socket.id)?.size) videoConsents.delete(socket.id)
+
         io.to(to).emit('partnerTurnedOffVideo')
         io.to(socket.id).emit('videoDisabled')
     })
@@ -128,6 +175,19 @@ export function handelSocketConnection(io, socket) {
     // ── Karma Rating ──────────────────────────────────────────
     socket.on('rateUser', async ({ to, rating }) => {
         if (!rating || !to) return
+
+        // Rate limit: max 10 ratings per minute per socket
+        if (isRateLimited(socket.id, 'rateUser')) {
+            console.warn(`[rateUser] Rate limited: ${socket.id}`)
+            return
+        }
+
+        // Must have been in a call with this person
+        if (!werePartnered(socket.id, to)) {
+            console.warn(`[rateUser] ${socket.id} tried to rate ${to} without being paired`)
+            return
+        }
+
         try {
             await client.hIncrBy(`karma:${to}`, rating, 1)
             await client.hIncrBy(`karma:${to}`, 'total', 1)
@@ -145,30 +205,37 @@ export function handelSocketConnection(io, socket) {
     })
 
     // ── Report (mid-call) ─────────────────────────────────────
-    // Separate from karma — can report DURING a call, not just after
     socket.on('reportUser', async ({ to, reason }) => {
         if (!to) return
+
+        // Rate limit: max 3 reports per minute per socket
+        if (isRateLimited(socket.id, 'reportUser')) {
+            console.warn(`[reportUser] Rate limited: ${socket.id}`)
+            return
+        }
+
+        // Must have been in a call with this person
+        if (!werePartnered(socket.id, to)) {
+            console.warn(`[reportUser] ${socket.id} tried to report ${to} without being paired`)
+            return
+        }
+
         try {
-            // Sorted set: reports:{socketId} → member=reporterSocketId, score=timestamp
-            // zAdd only adds once per reporter (members are unique)
             await client.zAdd(`reports:${to}`, {
-                score:  Date.now(),
-                value:  socket.id,
-            }, { NX: true })   // NX = only add if not already there (one report per user)
+                score: Date.now(),
+                value: socket.id,
+            }, { NX: true })
 
             const reportCount = await client.zCard(`reports:${to}`)
             console.log(`[Report] ${to} has ${reportCount} unique report(s). Reason: ${reason || 'none'}`)
 
-            // 3 unique reporters → auto-suspend
             if (reportCount >= 3) {
                 const reportedSocket = io.sockets.sockets.get(to)
                 if (reportedSocket) {
-                    // Suspend by email if available
                     if (reportedSocket.email) {
                         await client.sAdd('banned:emails', reportedSocket.email)
                         console.log(`[Report] Banned email: ${reportedSocket.email}`)
                     }
-                    // Add to suspended socket set (ephemeral — cleared on restart)
                     await client.sAdd('suspended', to)
                     reportedSocket.emit('accountSuspended',
                         'Your account has been suspended due to multiple reports.')
@@ -184,58 +251,75 @@ export function handelSocketConnection(io, socket) {
     // ── Community Channels ────────────────────────────────────
     socket.on('channel:join', async ({ channelId }) => {
         if (!channelId) return
-        socket.join(`ch:${channelId}`)
-        // Increment member count
-        await client.hIncrBy(`channel:${channelId}`, 'memberCount', 1)
-        // Tell everyone in channel how many are online
-        const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
-        io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+        try {
+            socket.join(`ch:${channelId}`)
+            await client.hIncrBy(`channel:${channelId}`, 'memberCount', 1)
+            const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
+            io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+        } catch (err) {
+            console.error('[channel:join]', err)
+        }
     })
 
     socket.on('channel:leave', async ({ channelId }) => {
         if (!channelId) return
-        socket.leave(`ch:${channelId}`)
-        await client.hIncrBy(`channel:${channelId}`, 'memberCount', -1)
-        const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
-        io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+        try {
+            socket.leave(`ch:${channelId}`)
+            await client.hIncrBy(`channel:${channelId}`, 'memberCount', -1)
+            const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
+            io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+        } catch (err) {
+            console.error('[channel:leave]', err)
+        }
     })
 
     socket.on('channel:message', async ({ channelId, content }) => {
         if (!channelId || !content?.trim()) return
 
-        // Basic content moderation: max 500 chars
-        const text = content.trim().slice(0, 500)
-
-        const msg = {
-            id:        `${Date.now()}-${socket.id.slice(0,6)}`,
-            channelId,
-            content:   text,
-            author:    socket.username || 'anonymous',
-            email:     socket.email    || null,
-            timestamp: Date.now(),
+        // Rate limit: 5 messages per 3 seconds
+        if (isRateLimited(socket.id, 'channel:message')) {
+            socket.emit('channel:rateLimited', { message: 'Slow down! Too many messages.' })
+            return
         }
 
-        // Store in Redis list, cap at 200 messages
-        await client.rPush(`channel:messages:${channelId}`, JSON.stringify(msg))
-        await client.lTrim(`channel:messages:${channelId}`, -200, -1)
+        try {
+            const text = content.trim().slice(0, 500)
 
-        // Bump channel score (for activity sorting)
-        await client.zAdd('channels', { score: Date.now(), value: channelId }, { XX: true })
+            const msg = {
+                id:        `${Date.now()}-${socket.id.slice(0, 6)}`,
+                channelId,
+                content:   text,
+                author:    socket.username || 'anonymous',
+                email:     socket.email    || null,
+                timestamp: Date.now(),
+            }
 
-        // Broadcast to everyone in the channel (including sender)
-        io.to(`ch:${channelId}`).emit('channel:message', msg)
+            await client.rPush(`channel:messages:${channelId}`, JSON.stringify(msg))
+            await client.lTrim(`channel:messages:${channelId}`, -200, -1)
+            await client.zAdd('channels', { score: Date.now(), value: channelId }, { XX: true })
+
+            io.to(`ch:${channelId}`).emit('channel:message', msg)
+        } catch (err) {
+            console.error('[channel:message]', err)
+            socket.emit('channel:error', { message: 'Failed to send message. Please try again.' })
+        }
     })
 
+    // Admin-only: delete a message via REST /admin endpoint instead of socket
+    // Kept here for backward compat but moves auth check to server-side only
     socket.on('channel:delete_message', async ({ channelId, messageId }) => {
-        // Only admins can delete — check admin key
         const adminKey = socket.handshake.auth.adminKey
-        if (adminKey !== process.env.ADMIN_KEY) return
+        if (!adminKey || adminKey !== process.env.ADMIN_KEY) return
 
-        const raw  = await client.lRange(`channel:messages:${channelId}`, 0, -1)
-        const kept = raw.filter(m => JSON.parse(m).id !== messageId)
-        await client.del(`channel:messages:${channelId}`)
-        if (kept.length) await client.rPush(`channel:messages:${channelId}`, ...kept)
-        io.to(`ch:${channelId}`).emit('channel:messageDeleted', { channelId, messageId })
+        try {
+            const raw  = await client.lRange(`channel:messages:${channelId}`, 0, -1)
+            const kept = raw.filter(m => JSON.parse(m).id !== messageId)
+            await client.del(`channel:messages:${channelId}`)
+            if (kept.length) await client.rPush(`channel:messages:${channelId}`, ...kept)
+            io.to(`ch:${channelId}`).emit('channel:messageDeleted', { channelId, messageId })
+        } catch (err) {
+            console.error('[channel:delete_message]', err)
+        }
     })
 
     // ── Disconnect cleanup ────────────────────────────────────
@@ -245,7 +329,19 @@ export function handelSocketConnection(io, socket) {
                 clearTimeout(pendingConnects.get(socket.id).timer)
                 pendingConnects.delete(socket.id)
             }
+
+            // FIX: clean up all consent Sets this socket is referenced IN
+            for (const [, consentSet] of videoConsents) {
+                consentSet.delete(socket.id)
+            }
             videoConsents.delete(socket.id)
+            // Remove empty Sets to prevent memory build-up
+            for (const [key, set] of videoConsents) {
+                if (!set.size) videoConsents.delete(key)
+            }
+
+            cleanupPartnership(socket.id)
+            cleanupRateLimit(socket.id)
             removeUser(socket.id)
             socket.removeAllListeners()
         } catch (error) {

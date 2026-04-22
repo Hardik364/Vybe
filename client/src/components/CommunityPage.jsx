@@ -99,12 +99,19 @@ export default function CommunityPage({ username: propUsername }) {
     const [liveCount,   setLiveCount]   = useState({})  // channelId → member count
     const [guestName,   setGuestName]   = useState('')
     const [showGuest,   setShowGuest]   = useState(!username)
+    const [toast,       setToast]       = useState(null) // { text, type: 'error'|'warn' }
 
     const socketRef  = useRef(null)
     const bottomRef  = useRef(null)
     const prevCh     = useRef(null)
 
     const activeChannel = channels.find(c => c.id === activeId)
+
+    // ── Toast helper ─────────────────────────────────────────
+    function showToast(text, type = 'error') {
+        setToast({ text, type })
+        setTimeout(() => setToast(null), 3500)
+    }
 
     // ── Guest login ──────────────────────────────────────────
     function handleGuestJoin(e) {
@@ -141,6 +148,14 @@ export default function CommunityPage({ username: propUsername }) {
             if (channelId === activeId) {
                 setMessages(prev => prev.filter(m => m.id !== messageId))
             }
+        })
+
+        sock.on('channel:rateLimited', ({ message }) => {
+            showToast(message || 'Slow down! Too many messages.', 'warn')
+        })
+
+        sock.on('channel:error', ({ message }) => {
+            showToast(message || 'Failed to send message.', 'error')
         })
 
         return () => sock.disconnect()
@@ -333,6 +348,13 @@ export default function CommunityPage({ username: propUsername }) {
                         })}
                         <div ref={bottomRef} />
                     </div>
+
+                    {/* Rate limit / error toast */}
+                    {toast && (
+                        <div className={`cm-toast cm-toast-${toast.type}`}>
+                            {toast.type === 'warn' ? '⚠️' : '❌'} {toast.text}
+                        </div>
+                    )}
 
                     {/* Input */}
                     <form className="cm-input-row" onSubmit={sendMessage}>

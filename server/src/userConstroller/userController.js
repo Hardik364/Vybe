@@ -3,6 +3,7 @@ import makePair from "./makePair.js";
 import addUserTODb from "./addUserToDb.js";
 import { getSelfQueue } from "../utils/tierMatching.js";
 import { updateStatus } from "../userRegistry.js";
+import { recordPartnership } from "../partnerships.js";
 
 // Broadcast waiting count for this socket's college queue
 export async function emitLiveCount(io, socket) {
@@ -45,6 +46,8 @@ export async function processUserPairing(io, socket) {
             const room = `waiting:${socket.collegeDomain || 'global'}`
             updateStatus(userPair[0].socketId, 'in-call', userPair[1].socketId, userPair[1].username)
             updateStatus(userPair[1].socketId, 'in-call', userPair[0].socketId, userPair[0].username)
+            // Record partnership so rateUser / reportUser can verify both were in a call
+            recordPartnership(userPair[0].socketId, userPair[1].socketId)
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
                 if (s) s.leave(room)

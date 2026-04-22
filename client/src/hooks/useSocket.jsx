@@ -51,11 +51,17 @@ export default function useSocket(
             })
             socket.on('strangerLeftTheChat', clearState)
             socket.on('errMakingPair', () => socket.emit('startConnection'))
+            socket.on('accountSuspended', (msg) => {
+                localStorage.removeItem('rt_token')
+                alert(`⛔ ${msg}`)
+                window.location.href = '/'
+            })
 
             return() => {
                 socket.removeAllListeners('getStragerData')
                 socket.removeAllListeners('strangerLeftTheChat')
                 socket.removeAllListeners('errMakingPair')
+                socket.removeAllListeners('accountSuspended')
             }
         }
     }, [socket])

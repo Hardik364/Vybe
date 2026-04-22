@@ -33,6 +33,9 @@ export default function ChatPage({ username, setUsername }) {
     // Phase 3: live count
     const [liveCount, setLiveCount]           = useState(0)
 
+    // Phase 5: report
+    const [reportSent, setReportSent]         = useState(false)
+
     const localVideo  = useRef(null)
     const remoteVideo = useRef(null)
 
@@ -54,8 +57,11 @@ export default function ChatPage({ username, setUsername }) {
         }
     }, [socket])
 
-    // Clear prompt when partner changes
-    useEffect(() => { setActivePrompt(null) }, [strangerUserId])
+    // Clear prompt + report state when partner changes
+    useEffect(() => {
+        setActivePrompt(null)
+        setReportSent(false)
+    }, [strangerUserId])
 
     // ── Phase 3: live count ──────────────────────────────────
     useEffect(() => {
@@ -105,6 +111,12 @@ export default function ChatPage({ username, setUsername }) {
         setShowKarma(true)
     }
 
+    function handleReport() {
+        if (!socket || !strangerUserId || reportSent) return
+        socket.emit('reportUser', { to: strangerUserId, reason: 'inappropriate behaviour' })
+        setReportSent(true)
+    }
+
     function handleKarmaRate() {
         setShowKarma(false)
         setActivePrompt(null)
@@ -120,6 +132,7 @@ export default function ChatPage({ username, setUsername }) {
                 promptActive={!!activePrompt}
                 onPromptClick={handlePromptToggle}
                 liveCount={liveCount}
+                setUsername={setUsername}
             />
 
             <div id="chatPage">
@@ -169,6 +182,19 @@ export default function ChatPage({ username, setUsername }) {
                         strangerUserId={strangerUserId}
                         connectionStatus={connectionStatus}
                     />
+                    {connectionStatus && (
+                        <div id="report-bar">
+                            <button
+                                id="reportBtn"
+                                onClick={handleReport}
+                                disabled={reportSent}
+                                title="Report this user for inappropriate behaviour"
+                            >
+                                {reportSent ? '✓ Reported' : '🚩 Report'}
+                            </button>
+                        </div>
+                    )}
+
                     <InputBox
                         socket={socket}
                         setMessage={setMessage}

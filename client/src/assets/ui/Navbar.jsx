@@ -1,4 +1,14 @@
-export default function Navbar({ strangerUsername, connectionStatus, promptActive, onPromptClick, liveCount }) {
+import { useNavigate } from 'react-router-dom'
+
+export default function Navbar({ strangerUsername, connectionStatus, promptActive, onPromptClick, liveCount, setUsername }) {
+    const navigate = useNavigate()
+
+    function handleLogout() {
+        localStorage.removeItem('rt_token')
+        if (setUsername) setUsername(null)
+        navigate('/')
+    }
+
     return (
         <nav id="navbar">
             <div id="nav-logo">
@@ -38,6 +48,10 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
                     aria-disabled={!connectionStatus}
                 >
                     🎲 Prompts
+                </button>
+
+                <button id="logoutBtn" onClick={handleLogout} title="Log out">
+                    ⏏︎
                 </button>
             </div>
         </nav>

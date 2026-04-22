@@ -10,9 +10,10 @@ import 'dotenv/config'
 const app = express();
 app.use(express.json())
 
-// Allow frontend origin
+// Allow frontend origin (strip trailing slash if any)
+const frontendOrigin = (process.env.PUBLIC_WEBSOCKET_URL || 'http://localhost:5173').replace(/\/$/, '')
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.PUBLIC_WEBSOCKET_URL || 'http://localhost:5173')
+  res.header('Access-Control-Allow-Origin', frontendOrigin)
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   if (req.method === 'OPTIONS') return res.sendStatus(200)

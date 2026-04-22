@@ -1,12 +1,14 @@
 import client from "../redisClient.js";
 import makePair from "./makePair.js";
-import addUserTODb from "./addUserToDb.js";
+import addUserTODb, { getQueueKey } from "./addUserToDb.js";
 
-// Broadcast current waiting queue length to all sockets in the 'waiting' room
-export async function emitLiveCount(io) {
+// Broadcast waiting count for this socket's college to everyone in that waiting room
+export async function emitLiveCount(io, socket) {
     try {
-        const count = await client.lLen("users")
-        io.to('waiting').emit('liveCount', count)
+        const queueKey = getQueueKey(socket)
+        const count    = await client.lLen(queueKey)
+        const room     = `waiting:${socket.collegeDomain || 'global'}`
+        io.to(room).emit('liveCount', count)
     } catch (err) {
         console.error('[emitLiveCount]', err)
     }
@@ -14,41 +16,58 @@ export async function emitLiveCount(io) {
 
 export async function processUserPairing(io, socket) {
     try {
-        const userLen = await client.lLen("users");
+        // Check if email is banned
+        if (socket.email) {
+            const banned = await client.sIsMember('banned:emails', socket.email)
+            if (banned) {
+                socket.emit('accountSuspended', 'Your account has been suspended.')
+                socket.disconnect(true)
+                return
+            }
+        }
+
+        const queueKey = getQueueKey(socket)
+        const userLen  = await client.lLen(queueKey)
+        const room     = `waiting:${socket.collegeDomain || 'global'}`
+
         if (userLen <= 0) {
-            const check = await soloUserLeftTheChat(socket);
-            if (check > 0) throw new Error("duplicate user found " + socket.username);
+            // Nobody waiting — add self to queue
+            const check = await soloUserLeftTheChat(socket)
+            if (check > 0) throw new Error("duplicate user in queue: " + socket.username)
 
-            await addUserTODb(socket);
+            await addUserTODb(socket)
+            socket.join(room)
             io.to(socket.id).emit("waiting", "Waiting for another user to join")
-            emitLiveCount(io)
+            emitLiveCount(io, socket)
         } else {
+            // Someone waiting — make a pair
             const userPair = await makePair(userLen, socket)
-            if (!userPair) throw new Error("error selecting pair " + socket.username);
+            if (!userPair) throw new Error("error selecting pair: " + socket.username)
 
-            // Remove both from the waiting room and broadcast updated count
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
-                if (s) s.leave('waiting')
+                if (s) s.leave(room)
                 io.to(key.socketId).emit("getStragerData", key)
             })
-            emitLiveCount(io)
+            emitLiveCount(io, socket)
         }
     } catch (err) {
-        socket.emit("errSelectingPair");
-        console.log(err);
+        socket.emit("errSelectingPair")
+        console.error('[processUserPairing]', err)
     }
 }
 
 export async function soloUserLeftTheChat(socket) {
     try {
-        const check = await client.lRem("users", 1, JSON.stringify({
-            'socketId': socket.id,
-            'username': socket.username
-        }));
-        console.log(socket.username, "left the chat", check);
-        return check;
+        const queueKey = getQueueKey(socket)
+        const check    = await client.lRem(queueKey, 1, JSON.stringify({
+            socketId:      socket.id,
+            username:      socket.username,
+            collegeDomain: socket.collegeDomain || 'global',
+        }))
+        console.log(`[Queue] ${socket.username} removed from ${queueKey}:`, check)
+        return check
     } catch (err) {
-        console.log(err);
+        console.error('[soloUserLeftTheChat]', err)
     }
 }

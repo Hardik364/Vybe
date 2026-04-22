@@ -17,25 +17,25 @@ function pickPrompt(excludeId = null) {
 const pendingConnects = new Map()
 
 // Track video consent: socketId → Set of consenting socket IDs
-const videoConsents = new Map()
+const videoConsents   = new Map()
 
 export function handelSocketConnection(io, socket) {
 
-    // ── Pairing ─────────────────────────────────────────────
+    // ── Pairing ──────────────────────────────────────────────
     socket.on("startConnection", () => {
-        socket.join('waiting')
         processUserPairing(io, socket)
     })
 
     socket.on("pairedUserLeftTheChat", to => {
         io.to(to).emit("strangerLeftTheChat")
-        emitLiveCount(io)
+        emitLiveCount(io, socket)
     })
 
     socket.on("soloUserLeftTheChat", () => {
+        const room = `waiting:${socket.collegeDomain || 'global'}`
         soloUserLeftTheChat(socket)
-        socket.leave('waiting')
-        emitLiveCount(io)
+        socket.leave(room)
+        emitLiveCount(io, socket)
     })
 
     // ── WebRTC signaling ─────────────────────────────────────
@@ -64,43 +64,35 @@ export function handelSocketConnection(io, socket) {
         io.to(to).emit('hidePrompt')
     })
 
-    // ── Video Consent (voice-first mutual opt-in) ────────────
+    // ── Video Consent ─────────────────────────────────────────
     socket.on('videoConsentOn', ({ to }) => {
         if (!videoConsents.has(to)) videoConsents.set(to, new Set())
         videoConsents.get(to).add(socket.id)
-
-        // Tell the partner this user wants video
         io.to(to).emit('partnerWantsVideo')
-
-        // If the partner already consented too → both get the green light
         const partnerConsents = videoConsents.get(socket.id)
         if (partnerConsents && partnerConsents.has(to)) {
             io.to(socket.id).emit('videoBothConsented')
             io.to(to).emit('videoBothConsented')
-            // clean up
             videoConsents.delete(socket.id)
             videoConsents.delete(to)
         }
     })
 
     socket.on('videoConsentOff', ({ to }) => {
-        // Revoke consent
         if (videoConsents.has(to)) videoConsents.get(to).delete(socket.id)
         io.to(to).emit('partnerTurnedOffVideo')
         io.to(socket.id).emit('videoDisabled')
     })
 
-    // ── Connect / Move On ────────────────────────────────────
+    // ── Connect / Move On ─────────────────────────────────────
     socket.on('connectRequest', ({ to }) => {
         if (pendingConnects.has(to) && pendingConnects.get(to).partnerId === socket.id) {
-            // Both pressed Connect — exchange contacts
             clearTimeout(pendingConnects.get(to).timer)
             pendingConnects.delete(to)
             pendingConnects.delete(socket.id)
             io.to(socket.id).emit('contactsExchanged')
             io.to(to).emit('contactsExchanged')
         } else {
-            // First to press — wait up to 31s for partner
             const timer = setTimeout(() => {
                 pendingConnects.delete(socket.id)
                 io.to(socket.id).emit('connectExpired')
@@ -110,7 +102,7 @@ export function handelSocketConnection(io, socket) {
         }
     })
 
-    socket.on('cancelConnect', ({ to }) => {
+    socket.on('cancelConnect', () => {
         if (pendingConnects.has(socket.id)) {
             clearTimeout(pendingConnects.get(socket.id).timer)
             pendingConnects.delete(socket.id)
@@ -118,49 +110,80 @@ export function handelSocketConnection(io, socket) {
     })
 
     socket.on('moveOn', ({ to }) => {
-        // Clean up any pending connect
         if (pendingConnects.has(socket.id)) {
             clearTimeout(pendingConnects.get(socket.id).timer)
             pendingConnects.delete(socket.id)
         }
-        // Let the partner know
         io.to(to).emit('partnerMovedOn')
     })
 
-    // ── Karma Rating ─────────────────────────────────────────
+    // ── Karma Rating ──────────────────────────────────────────
     socket.on('rateUser', async ({ to, rating }) => {
         if (!rating || !to) return
         try {
             await client.hIncrBy(`karma:${to}`, rating, 1)
             await client.hIncrBy(`karma:${to}`, 'total', 1)
 
-            // Shadow-ban check: if disrespectful > 20% of total calls
             const karma = await client.hGetAll(`karma:${to}`)
             const total = parseInt(karma.total || 0)
             const bad   = parseInt(karma.disrespectful || 0)
             if (total >= 5 && bad / total > 0.2) {
                 await client.sAdd('shadowBanned', to)
-                console.log(`[Karma] Shadow-banned socket ${to} (${bad}/${total} disrespectful)`)
+                console.log(`[Karma] Shadow-banned ${to} (${bad}/${total} disrespectful)`)
             }
         } catch (err) {
-            console.error('[rateUser] Redis error:', err)
+            console.error('[rateUser]', err)
         }
     })
 
-    // ── Disconnect cleanup ───────────────────────────────────
+    // ── Report (mid-call) ─────────────────────────────────────
+    // Separate from karma — can report DURING a call, not just after
+    socket.on('reportUser', async ({ to, reason }) => {
+        if (!to) return
+        try {
+            // Sorted set: reports:{socketId} → member=reporterSocketId, score=timestamp
+            // zAdd only adds once per reporter (members are unique)
+            await client.zAdd(`reports:${to}`, {
+                score:  Date.now(),
+                value:  socket.id,
+            }, { NX: true })   // NX = only add if not already there (one report per user)
+
+            const reportCount = await client.zCard(`reports:${to}`)
+            console.log(`[Report] ${to} has ${reportCount} unique report(s). Reason: ${reason || 'none'}`)
+
+            // 3 unique reporters → auto-suspend
+            if (reportCount >= 3) {
+                const reportedSocket = io.sockets.sockets.get(to)
+                if (reportedSocket) {
+                    // Suspend by email if available
+                    if (reportedSocket.email) {
+                        await client.sAdd('banned:emails', reportedSocket.email)
+                        console.log(`[Report] Banned email: ${reportedSocket.email}`)
+                    }
+                    // Add to suspended socket set (ephemeral — cleared on restart)
+                    await client.sAdd('suspended', to)
+                    reportedSocket.emit('accountSuspended',
+                        'Your account has been suspended due to multiple reports.')
+                    reportedSocket.disconnect(true)
+                    console.log(`[Report] Auto-suspended socket ${to}`)
+                }
+            }
+        } catch (err) {
+            console.error('[reportUser]', err)
+        }
+    })
+
+    // ── Disconnect cleanup ────────────────────────────────────
     socket.on('disconnect', () => {
         try {
-            // Clean up pending connect
             if (pendingConnects.has(socket.id)) {
                 clearTimeout(pendingConnects.get(socket.id).timer)
                 pendingConnects.delete(socket.id)
             }
-            // Clean up video consent
             videoConsents.delete(socket.id)
-
             socket.removeAllListeners()
         } catch (error) {
-            console.error(error)
+            console.error('[disconnect cleanup]', error)
         }
     })
 }

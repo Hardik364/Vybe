@@ -33,7 +33,6 @@ export default function LocalVideo({
             return () => {
                 if (streamInstance) {
                     streamInstance.getTracks().forEach(t => t.stop())
-                    console.log("stop stream")
                 }
             }
         }

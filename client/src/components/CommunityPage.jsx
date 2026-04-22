@@ -99,10 +99,12 @@ export default function CommunityPage({ username: propUsername }) {
     const [liveCount,   setLiveCount]   = useState({})  // channelId → member count
     const [guestName,   setGuestName]   = useState('')
     const [showGuest,   setShowGuest]   = useState(!username)
-    const [toast,       setToast]       = useState(null) // { text, type: 'error'|'warn' }
-    const [typers,      setTypers]      = useState([])   // usernames currently typing
-    const [reported,    setReported]    = useState(new Set()) // messageIds already reported
-    const [karma,       setKarma]       = useState(null)  // { great, okay, disrespectful, total }
+    const [toast,        setToast]       = useState(null)     // { text, type: 'error'|'warn' }
+    const [typers,       setTypers]     = useState([])        // usernames currently typing
+    const [reported,     setReported]   = useState(new Set()) // messageIds already reported
+    const [karma,        setKarma]      = useState(null)      // { great, okay, disrespectful, total }
+    const [chLoading,    setChLoading]  = useState(true)      // channels first load
+    const [chError,      setChError]    = useState(false)     // failed to load channels
 
     const typingTimerRef = useRef(null)
     const isTypingRef    = useRef(false)
@@ -203,14 +205,20 @@ export default function CommunityPage({ username: propUsername }) {
 
     // ── Load channels list ───────────────────────────────────
     useEffect(() => {
+        setChLoading(true)
+        setChError(false)
         fetch(`${API}/community/channels`)
             .then(r => r.json())
             .then(list => {
                 const arr = Array.isArray(list) ? list : []
                 setChannels(arr)
                 if (!activeId && arr.length) setActiveId(arr[0].id)
+                setChLoading(false)
             })
-            .catch(console.error)
+            .catch(() => {
+                setChLoading(false)
+                setChError(true)
+            })
     }, [])
 
     // ── Switch channel ───────────────────────────────────────
@@ -336,6 +344,21 @@ export default function CommunityPage({ username: propUsername }) {
                     </div>
 
                     <div className="cm-channel-list">
+                        {chLoading && (
+                            <div className="cm-ch-loading">
+                                <div className="cm-ch-loading-dot" /><div className="cm-ch-loading-dot" /><div className="cm-ch-loading-dot" />
+                            </div>
+                        )}
+                        {chError && (
+                            <div className="cm-ch-error">
+                                <span>⚠️</span>
+                                <span>Couldn't load channels</span>
+                                <button onClick={() => window.location.reload()}>Retry</button>
+                            </div>
+                        )}
+                        {!chLoading && !chError && channels.length === 0 && (
+                            <div className="cm-ch-error">No channels yet</div>
+                        )}
                         {channels.map(ch => (
                             <button
                                 key={ch.id}

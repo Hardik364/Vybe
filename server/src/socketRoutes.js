@@ -1,4 +1,5 @@
 import { processUserPairing, soloUserLeftTheChat, emitLiveCount } from "./userConstroller/userController.js"
+// soloUserLeftTheChat is also called on disconnect to purge ghost queue entries
 import { registerUser, updateStatus, removeUser } from "./userRegistry.js"
 import { werePartnered, cleanupPartnership } from "./partnerships.js"
 import { readFileSync } from 'fs'
@@ -379,19 +380,24 @@ export function handelSocketConnection(io, socket) {
     })
 
     // ── Disconnect cleanup ────────────────────────────────────
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         try {
+            // ── CRITICAL: remove from Redis waiting queue ─────
+            // Without this, a refresh leaves a ghost entry in the queue.
+            // The ghost can be picked up and paired with the same user's
+            // new socket — making them talk to themselves.
+            await soloUserLeftTheChat(socket)
+
             if (pendingConnects.has(socket.id)) {
                 clearTimeout(pendingConnects.get(socket.id).timer)
                 pendingConnects.delete(socket.id)
             }
 
-            // FIX: clean up all consent Sets this socket is referenced IN
+            // Clean up all consent Sets this socket is referenced IN
             for (const [, consentSet] of videoConsents) {
                 consentSet.delete(socket.id)
             }
             videoConsents.delete(socket.id)
-            // Remove empty Sets to prevent memory build-up
             for (const [key, set] of videoConsents) {
                 if (!set.size) videoConsents.delete(key)
             }

@@ -1,52 +1,67 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
-const CONNECT_WINDOW = 30
+const CONNECT_WINDOW       = 30
+const CONTACT_TIMEOUT_MS   = 60000  // 60s — auto-close if partner never submits contact
 
 export default function PostCallScreen({ strangerUsername, strangerUserId, socket, onConnect, onMoveOn }) {
     const [timeLeft,        setTimeLeft]        = useState(CONNECT_WINDOW)
     const [connectPressed,  setConnectPressed]  = useState(false)
+    const [waitingForThem,  setWaitingForThem]  = useState(false) // server confirmed our request pending
     const [bothConnected,   setBothConnected]   = useState(false)
     // Contact exchange state
     const [contact,         setContact]         = useState('')
     const [contactType,     setContactType]     = useState('whatsapp')  // 'whatsapp' | 'instagram'
     const [submitted,       setSubmitted]       = useState(false)
     const [revealedContact, setRevealedContact] = useState(null)
+    const contactTimeoutRef = useRef(null)
 
     // ── Server-driven events ─────────────────────────────────
     useEffect(() => {
         if (!socket) return
 
+        // Both pressed Connect — move to contact exchange screen
         socket.on('contactsExchanged', () => setBothConnected(true))
+
+        // Server confirmed our connect request is pending (partner hasn't pressed yet)
+        socket.on('connectPending', () => setWaitingForThem(true))
 
         socket.on('connectExpired', () => onMoveOn())
 
         socket.on('partnerMovedOn', () => onMoveOn())
 
-        socket.on('contactSubmitted', () => {
-            // Our contact was received, waiting for partner
-            setSubmitted(true)
-        })
+        socket.on('contactSubmitted', () => setSubmitted(true))
 
         socket.on('contactRevealed', ({ contact: theirContact }) => {
+            clearTimeout(contactTimeoutRef.current)
             setRevealedContact(theirContact)
         })
 
         return () => {
             socket.off('contactsExchanged')
+            socket.off('connectPending')
             socket.off('connectExpired')
             socket.off('partnerMovedOn')
             socket.off('contactSubmitted')
             socket.off('contactRevealed')
+            clearTimeout(contactTimeoutRef.current)
         }
     }, [socket])
 
-    // ── Local countdown (UI only — server enforces real 30s) ─
+    // 60s safety timeout on contact exchange — don't leave user stuck forever
     useEffect(() => {
-        if (connectPressed || bothConnected) return
+        if (!submitted) return
+        contactTimeoutRef.current = setTimeout(() => onMoveOn(), CONTACT_TIMEOUT_MS)
+        return () => clearTimeout(contactTimeoutRef.current)
+    }, [submitted])
+
+    // ── Local countdown ───────────────────────────────────────
+    // Keep counting even after pressing Connect — server expires at 31s anyway
+    useEffect(() => {
+        if (bothConnected) return
         if (timeLeft <= 0) { handleMoveOn(); return }
         const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000)
         return () => clearTimeout(timer)
-    }, [timeLeft, connectPressed, bothConnected])
+    }, [timeLeft, bothConnected])
 
     function handleConnect() {
         setConnectPressed(true)
@@ -188,11 +203,15 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
                         className={connectPressed ? 'pressed' : ''}
                     >
                         <span id="connect-btn-label">
-                            {connectPressed ? 'Waiting for them...' : 'Connect 🤝'}
+                            {waitingForThem
+                                ? '⏳ Waiting for them…'
+                                : connectPressed
+                                    ? 'Connect 🤝'
+                                    : 'Connect 🤝'}
                         </span>
-                        {!connectPressed && (
-                            <span id="connect-timer">{timeLeft}s</span>
-                        )}
+                        <span id="connect-timer">
+                            {connectPressed ? `${timeLeft}s left` : `${timeLeft}s`}
+                        </span>
                     </button>
 
                     <button id="moveOnBtn" onClick={handleMoveOn}>

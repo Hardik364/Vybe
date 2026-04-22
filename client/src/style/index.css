@@ -1817,6 +1817,49 @@ input  { font-family: inherit; }
     padding: 0 8px;
 }
 
+.cm-ch-loading {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+    padding: 16px 0;
+}
+
+.cm-ch-loading-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: cm-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.cm-ch-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.cm-ch-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.cm-ch-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.cm-ch-error button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: var(--r-sm);
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 2px;
+    transition: all var(--t-fast);
+}
+
+.cm-ch-error button:hover { border-color: var(--accent); color: var(--accent); }
+
 .cm-channel-item {
     display: flex;
     align-items: center;

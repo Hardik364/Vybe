@@ -38,10 +38,15 @@ export default async function makePair(socket) {
 
         const parsedUserData = JSON.parse(rawUserData)
 
-        // Don't pair with self
-        if (parsedUserData.socketId === socket.id) {
-            // Put them back and keep searching
-            await client.rPush(queueKey, rawUserData)
+        // Don't pair with self — check BOTH socket ID and username.
+        // Username check catches the refresh-ghost bug: same user reconnects
+        // with a new socket ID but same username, finds their own stale entry.
+        const isSelf = parsedUserData.socketId === socket.id ||
+                       (parsedUserData.username &&
+                        parsedUserData.username === socket.username)
+        if (isSelf) {
+            // Discard ghost entry — it's the same person, don't put it back
+            console.log(`[Pair] Discarded ghost entry for ${socket.username}`)
             continue
         }
 

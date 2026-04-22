@@ -7,6 +7,7 @@ import { rateLimit } from "express-rate-limit";
 import client from "./src/redisClient.js";
 import { handelSocketConnection } from "./src/socketRoutes.js";
 import authRoutes from "./src/authRoutes.js";
+import adminRoutes from "./src/adminRoutes.js";
 import 'dotenv/config'
 
 const app = express();
@@ -100,6 +101,8 @@ io.on("connection", (socket) => {
 
 // ── Routes ───────────────────────────────────────────────────
 app.use('/auth', authRoutes)
+app.locals.io = io          // give admin routes access to io
+app.use('/admin', adminRoutes)
 
 // Stats — protect with a simple token in production
 app.get('/stats', async (req, res) => {

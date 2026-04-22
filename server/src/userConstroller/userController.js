@@ -2,6 +2,7 @@ import client from "../redisClient.js";
 import makePair from "./makePair.js";
 import addUserTODb from "./addUserToDb.js";
 import { getSelfQueue } from "../utils/tierMatching.js";
+import { updateStatus } from "../userRegistry.js";
 
 // Broadcast waiting count for this socket's college queue
 export async function emitLiveCount(io, socket) {
@@ -40,8 +41,10 @@ export async function processUserPairing(io, socket) {
             io.to(socket.id).emit("waiting", "Waiting for another user to join")
             emitLiveCount(io, socket)
         } else {
-            // Paired — notify both sockets
+            // Paired — notify both sockets and update registry
             const room = `waiting:${socket.collegeDomain || 'global'}`
+            updateStatus(userPair[0].socketId, 'in-call', userPair[1].socketId, userPair[1].username)
+            updateStatus(userPair[1].socketId, 'in-call', userPair[0].socketId, userPair[0].username)
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
                 if (s) s.leave(room)

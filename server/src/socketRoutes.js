@@ -1,4 +1,5 @@
 import { processUserPairing, soloUserLeftTheChat, emitLiveCount } from "./userConstroller/userController.js"
+import { registerUser, updateStatus, removeUser } from "./userRegistry.js"
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -21,13 +22,19 @@ const videoConsents   = new Map()
 
 export function handelSocketConnection(io, socket) {
 
+    // Register user in live registry
+    registerUser(socket)
+
     // ── Pairing ──────────────────────────────────────────────
     socket.on("startConnection", () => {
+        updateStatus(socket.id, 'waiting')
         processUserPairing(io, socket)
     })
 
     socket.on("pairedUserLeftTheChat", to => {
         io.to(to).emit("strangerLeftTheChat")
+        updateStatus(socket.id, 'waiting')
+        updateStatus(to, 'waiting')
         emitLiveCount(io, socket)
     })
 
@@ -35,6 +42,7 @@ export function handelSocketConnection(io, socket) {
         const room = `waiting:${socket.collegeDomain || 'global'}`
         soloUserLeftTheChat(socket)
         socket.leave(room)
+        updateStatus(socket.id, 'connecting')
         emitLiveCount(io, socket)
     })
 
@@ -181,6 +189,7 @@ export function handelSocketConnection(io, socket) {
                 pendingConnects.delete(socket.id)
             }
             videoConsents.delete(socket.id)
+            removeUser(socket.id)
             socket.removeAllListeners()
         } catch (error) {
             console.error('[disconnect cleanup]', error)

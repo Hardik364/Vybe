@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import SingUp from "./SingUp";
 import ChatPage from "./ChatPage";
+import AdminDashboard from "./AdminDashboard";
 
 function App() {
   const [username, setUsername] = useState(null)
@@ -18,6 +19,10 @@ function App() {
     {
       path: '/chat',
       element: <ChatPage username={username} setUsername={handleSetUsername} />
+    },
+    {
+      path: '/admin',
+      element: <AdminDashboard />
     }
   ]);
 

@@ -181,6 +181,63 @@ export function handelSocketConnection(io, socket) {
         }
     })
 
+    // ── Community Channels ────────────────────────────────────
+    socket.on('channel:join', async ({ channelId }) => {
+        if (!channelId) return
+        socket.join(`ch:${channelId}`)
+        // Increment member count
+        await client.hIncrBy(`channel:${channelId}`, 'memberCount', 1)
+        // Tell everyone in channel how many are online
+        const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
+        io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+    })
+
+    socket.on('channel:leave', async ({ channelId }) => {
+        if (!channelId) return
+        socket.leave(`ch:${channelId}`)
+        await client.hIncrBy(`channel:${channelId}`, 'memberCount', -1)
+        const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
+        io.to(`ch:${channelId}`).emit('channel:memberCount', { channelId, count })
+    })
+
+    socket.on('channel:message', async ({ channelId, content }) => {
+        if (!channelId || !content?.trim()) return
+
+        // Basic content moderation: max 500 chars
+        const text = content.trim().slice(0, 500)
+
+        const msg = {
+            id:        `${Date.now()}-${socket.id.slice(0,6)}`,
+            channelId,
+            content:   text,
+            author:    socket.username || 'anonymous',
+            email:     socket.email    || null,
+            timestamp: Date.now(),
+        }
+
+        // Store in Redis list, cap at 200 messages
+        await client.rPush(`channel:messages:${channelId}`, JSON.stringify(msg))
+        await client.lTrim(`channel:messages:${channelId}`, -200, -1)
+
+        // Bump channel score (for activity sorting)
+        await client.zAdd('channels', { score: Date.now(), value: channelId }, { XX: true })
+
+        // Broadcast to everyone in the channel (including sender)
+        io.to(`ch:${channelId}`).emit('channel:message', msg)
+    })
+
+    socket.on('channel:delete_message', async ({ channelId, messageId }) => {
+        // Only admins can delete — check admin key
+        const adminKey = socket.handshake.auth.adminKey
+        if (adminKey !== process.env.ADMIN_KEY) return
+
+        const raw  = await client.lRange(`channel:messages:${channelId}`, 0, -1)
+        const kept = raw.filter(m => JSON.parse(m).id !== messageId)
+        await client.del(`channel:messages:${channelId}`)
+        if (kept.length) await client.rPush(`channel:messages:${channelId}`, ...kept)
+        io.to(`ch:${channelId}`).emit('channel:messageDeleted', { channelId, messageId })
+    })
+
     // ── Disconnect cleanup ────────────────────────────────────
     socket.on('disconnect', () => {
         try {

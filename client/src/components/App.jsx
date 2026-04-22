@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import SingUp from "./SingUp";
 import ChatPage from "./ChatPage";
 import AdminDashboard from "./AdminDashboard";
+import CommunityPage from "./CommunityPage";
 
 function App() {
   const [username, setUsername] = useState(null)
@@ -23,6 +24,10 @@ function App() {
     {
       path: '/admin',
       element: <AdminDashboard />
+    },
+    {
+      path: '/community',
+      element: <CommunityPage username={username} />
     }
   ]);
 

@@ -269,6 +269,12 @@ export default function SingUp({ setUsername }) {
                         onBack={() => setStep('email')}
                     />
                 )}
+
+                <div id="signup-community-link">
+                    <button onClick={() => navigate('/community')}>
+                        💬 Browse Community Channels →
+                    </button>
+                </div>
             </div>
         </div>
     )

@@ -16,9 +16,10 @@ export default function useSocket(
 
     useEffect(() => {
         if (username) {
+            const token = localStorage.getItem('rt_token')
             const newSocket = io(import.meta.env.VITE_APP_WEBSOCKET_URL, {
                 transports: ['websocket'],
-                auth: { username: username }
+                auth: { username, token: token || undefined }
             });
             setSocket(newSocket);
 

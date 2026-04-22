@@ -1,0 +1,25 @@
+{
+  "patterns": [
+    ".ac.in",
+    ".edu.in",
+    ".edu"
+  ],
+  "known": [
+    "iitb.ac.in", "iitd.ac.in", "iitk.ac.in", "iitm.ac.in", "iitkgp.ac.in",
+    "iitg.ac.in", "iith.ac.in", "iiti.ac.in", "iitbbs.ac.in", "iitj.ac.in",
+    "iitmandi.ac.in", "iitpkd.ac.in", "iitgoa.ac.in", "iitdh.ac.in", "iitbhilai.ac.in",
+    "iisc.ac.in",
+    "nitt.edu", "nitw.ac.in", "nitk.ac.in", "mnnit.ac.in", "svnit.ac.in",
+    "vnit.ac.in", "manit.ac.in", "nitdgp.ac.in", "nitsri.ac.in", "nitj.ac.in",
+    "du.ac.in", "jnu.ac.in", "bhu.ac.in", "hcu.ac.in", "uohyd.ac.in",
+    "amu.ac.in", "bits-pilani.ac.in", "pilani.bits-pilani.ac.in",
+    "goa.bits-pilani.ac.in", "hyderabad.bits-pilani.ac.in",
+    "vit.ac.in", "vitap.ac.in", "vitbhopal.ac.in", "manipal.edu",
+    "christuniversity.in", "srmist.edu.in", "sastra.edu",
+    "mu.ac.in", "pu.ac.in", "ou.ac.in", "cusat.ac.in", "uoh.ac.in",
+    "thapar.edu", "lpu.in", "amity.edu", "symbiosis.ac.in",
+    "iimb.ac.in", "iima.ac.in", "iimc.ac.in", "iimk.ac.in", "iiml.ac.in",
+    "xlri.ac.in", "spjimr.org", "iift.ac.in"
+  ],
+  "comment": "In development mode (NODE_ENV != production), any email is accepted for testing."
+}

@@ -201,6 +201,86 @@ input  { font-family: inherit; }
     text-align: center;
 }
 
+/* ── Signup error message ── */
+.signup-error {
+    color: var(--red);
+    font-size: 13px;
+    text-align: center;
+    margin: -4px 0 4px;
+    animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25%       { transform: translateX(-6px); }
+    75%       { transform: translateX(6px); }
+}
+
+/* ── OTP step ── */
+#otp-sent-msg {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+#otp-inputs {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.otp-digit {
+    width: 48px;
+    height: 56px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
+    caret-color: var(--accent);
+}
+
+.otp-digit:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.otp-digit:not(:placeholder-shown) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#otp-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+#otp-back-btn,
+#otp-resend-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--r-sm);
+    transition: color var(--t-fast);
+}
+
+#otp-back-btn    { color: var(--text-muted); }
+#otp-back-btn:hover { color: var(--text-secondary); }
+
+#otp-resend-btn  { color: var(--accent); }
+#otp-resend-btn:hover:not(:disabled) { color: var(--accent-hover); }
+#otp-resend-btn:disabled { color: var(--text-muted); cursor: default; }
+
 /* ============================================================
    APP SHELL
    ============================================================ */

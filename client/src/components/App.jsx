@@ -3,22 +3,21 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import SingUp from "./SingUp";
 import ChatPage from "./ChatPage";
 
-
 function App() {
-
   const [username, setUsername] = useState(null)
+
+  function handleSetUsername(name) {
+    setUsername(name)
+  }
 
   const router = createBrowserRouter([
     {
       path: '/',
-      element: <SingUp setUsername={setUsername} />,
+      element: <SingUp setUsername={handleSetUsername} />,
     },
     {
       path: '/chat',
-      element: <ChatPage 
-      username ={username} 
-      setUsername={setUsername}  
-      />
+      element: <ChatPage username={username} setUsername={handleSetUsername} />
     }
   ]);
 

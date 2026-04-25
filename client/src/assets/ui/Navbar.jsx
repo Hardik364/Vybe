@@ -50,10 +50,6 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
                     🎲 Prompts
                 </button>
 
-                <button id="communityBtn" onClick={() => navigate('/community')} title="Community channels">
-                    💬 Community
-                </button>
-
                 <button id="logoutBtn" onClick={handleLogout} title="Log out">
                     ⏏︎
                 </button>

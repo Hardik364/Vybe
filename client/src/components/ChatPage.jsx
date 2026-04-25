@@ -12,6 +12,7 @@ import PromptCard from '../assets/ui/PromptCard'
 import PostCallScreen from '../assets/ui/PostCallScreen'
 import KarmaModal from '../assets/ui/KarmaModal'
 import UpgradeModal from '../assets/ui/UpgradeModal'
+import NotifyMe from '../assets/ui/NotifyMe'
 
 export default function ChatPage({ username, setUsername }) {
     // Core state
@@ -33,6 +34,9 @@ export default function ChatPage({ username, setUsername }) {
 
     // Phase 3: live count
     const [liveCount, setLiveCount]           = useState(0)
+
+    // Notify Me: extract college domain from JWT for subscription key
+    const [collegeDomain, setCollegeDomain]   = useState('global')
 
     // Phase 5: report
     const [reportSent, setReportSent]         = useState(false)
@@ -83,7 +87,12 @@ export default function ChatPage({ username, setUsername }) {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(r => r.json())
-            .then(d => { if (d.valid && d.tier) setUserTier(d.tier) })
+            .then(d => {
+                if (d.valid) {
+                    if (d.tier) setUserTier(d.tier)
+                    if (d.collegeDomain) setCollegeDomain(d.collegeDomain)
+                }
+            })
             .catch(() => {})
     }, [])
 
@@ -212,6 +221,11 @@ export default function ChatPage({ username, setUsername }) {
                                 {reportSent ? '✓ Reported' : '🚩 Report'}
                             </button>
                         </div>
+                    )}
+
+                    {/* Notify Me — only when nobody is waiting and not in a call */}
+                    {!connectionStatus && liveCount === 0 && (
+                        <NotifyMe collegeDomain={collegeDomain} />
                     )}
 
                     <InputBox

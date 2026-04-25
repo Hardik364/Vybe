@@ -2393,3 +2393,146 @@ input  { font-family: inherit; }
     .cm-emoji-btn  { width: 34px; height: 34px; font-size: 18px; }
     .cm-chat-title { font-size: 14px; }
 }
+
+
+/* -- Guest CTA (SingUp.jsx) ------------------------------- */
+#signup-guest-cta {
+    margin-top: 6px;
+    text-align: center;
+}
+
+#signup-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0 12px;
+    color: rgba(255,255,255,0.3);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+#signup-divider::before,
+#signup-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.12);
+}
+
+#guestBtn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px dashed rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.65);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .2s, border-color .2s, color .2s;
+}
+
+#guestBtn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.9);
+}
+
+#guest-cta-note {
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    margin-top: 6px;
+}
+
+/* -- Guest gate (PostCallScreen.jsx) ---------------------- */
+#guest-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 36px 24px;
+    text-align: center;
+}
+
+#guest-gate-emoji { font-size: 52px; line-height: 1; }
+
+#guest-gate-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+}
+
+#guest-gate-body {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    max-width: 300px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+#guest-signup-btn {
+    margin-top: 8px;
+    padding: 14px 36px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent, #7c3aed);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s, transform .15s;
+}
+
+#guest-signup-btn:hover { opacity: .88; transform: translateY(-1px); }
+
+#guest-gate-note {
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    margin: 0;
+}
+
+/* -- NotifyMe button (ChatPage.jsx) ----------------------- */
+.notify-me-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 14px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: 1px dashed rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+    width: calc(100% - 28px);
+    box-sizing: border-box;
+}
+
+.notify-me-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+}
+
+.notify-me-btn.loading {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.notify-me-icon { font-size: 16px; }
+
+.notify-me-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.55);
+    font-size: 13px;
+}
+
+.notify-me-denied { color: rgba(255,100,100,0.7); }

@@ -4,6 +4,7 @@ import addUserTODb from "./addUserToDb.js";
 import { getSelfQueue } from "../utils/tierMatching.js";
 import { updateStatus } from "../userRegistry.js";
 import { recordPartnership } from "../partnerships.js";
+import { sendCollegeNotifications } from "../pushNotify.js";
 
 // Broadcast waiting count for this socket's college queue
 export async function emitLiveCount(io, socket) {
@@ -35,12 +36,21 @@ export async function processUserPairing(io, socket) {
         if (!userPair) {
             // Nobody available — add self to waiting queue
             await soloUserLeftTheChat(socket)   // clean up stale entry first
+            const queueKey    = getSelfQueue(socket)
+            const prevCount   = await client.lLen(queueKey)
             await addUserTODb(socket)
 
             const room = `waiting:${socket.collegeDomain || 'global'}`
             socket.join(room)
             io.to(socket.id).emit("waiting", "Waiting for another user to join")
             emitLiveCount(io, socket)
+
+            // 0 → 1 transition: notify waitlisted users for this college
+            if (prevCount === 0) {
+                sendCollegeNotifications(socket.collegeDomain || 'global').catch(err =>
+                    console.error('[Push] sendCollegeNotifications error:', err)
+                )
+            }
         } else {
             // Paired — notify both sockets and update registry
             const room = `waiting:${socket.collegeDomain || 'global'}`

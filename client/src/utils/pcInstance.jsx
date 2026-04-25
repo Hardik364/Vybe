@@ -1,29 +1,44 @@
-// ICE server configuration
-// STUN: free, discovers public IP — works for ~80% of users
-// TURN: relay server for users behind strict NAT/firewalls (~20%)
+// ICE server config — fetched from the server at startup so TURN credentials
+// never appear in the client bundle or Vite env vars.
 //
-// For production: replace the TURN credentials with your own Coturn server
-// Self-host on a ₹500/month VPS: github.com/coturn/coturn
-// Or use a managed service: Metered.ca (free tier: 50GB/month)
+// Call initIceServers() once on app mount (App.jsx).
+// setPcInstance() uses the cached result from that point on.
 
-const ICE_SERVERS = [
-    // Google STUN (free, always use this)
+const FALLBACK_ICE = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-
-    // Public TURN servers (limited bandwidth — replace with own in production)
-    // Metered.ca free tier — good for development/testing
-    ...(import.meta.env.VITE_TURN_URL ? [{
-        urls:       import.meta.env.VITE_TURN_URL,
-        username:   import.meta.env.VITE_TURN_USERNAME,
-        credential: import.meta.env.VITE_TURN_CREDENTIAL,
-    }] : []),
 ]
 
+let cachedIceServers = null  // populated by initIceServers()
+
+// Fetch once and cache.  Called from App.jsx on mount.
+export async function initIceServers() {
+    if (cachedIceServers) return cachedIceServers
+    try {
+        const res = await fetch(
+            `${import.meta.env.VITE_APP_WEBSOCKET_URL}/api/ice-servers`,
+            { signal: AbortSignal.timeout(4000) }
+        )
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const servers = await res.json()
+        if (Array.isArray(servers) && servers.length) {
+            cachedIceServers = servers
+            console.log(`[ICE] Loaded ${servers.length} server(s) from API`)
+        } else {
+            throw new Error('Empty ICE server list')
+        }
+    } catch (err) {
+        console.warn('[ICE] Could not fetch ICE servers — using STUN fallback:', err.message)
+        cachedIceServers = FALLBACK_ICE
+    }
+    return cachedIceServers
+}
+
+// Synchronous factory — safe to call once initIceServers() has resolved.
 export default function setPcInstance() {
-    const pcInstance = new RTCPeerConnection({
-        iceServers:           ICE_SERVERS,
+    const iceServers = cachedIceServers || FALLBACK_ICE
+    return new RTCPeerConnection({
+        iceServers,
         iceCandidatePoolSize: 10,
     })
-    return pcInstance
 }

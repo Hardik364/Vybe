@@ -241,7 +241,19 @@ export default function SingUp({ setUsername }) {
 
     function handleVerified(token, username) {
         localStorage.setItem('rt_token', token)
+        localStorage.removeItem('rt_guest')  // clear guest flag if they sign up
         setUsername(username)
+        navigate('/chat')
+    }
+
+    // ── Guest mode ────────────────────────────────────────────
+    function handleGuest() {
+        const adjs  = ['Cool', 'Curious', 'Chill', 'Bold', 'Witty', 'Bright', 'Swift', 'Calm']
+        const nouns = ['Panda', 'Llama', 'Falcon', 'Otter', 'Gecko', 'Koala', 'Lynx', 'Moose']
+        const rand  = n => Math.floor(Math.random() * n)
+        const name  = `${adjs[rand(adjs.length)]}${nouns[rand(nouns.length)]}${rand(90) + 10}`
+        localStorage.setItem('rt_guest', '1')
+        setUsername(name)
         navigate('/chat')
     }
 
@@ -270,11 +282,16 @@ export default function SingUp({ setUsername }) {
                     />
                 )}
 
-                <div id="signup-community-link">
-                    <button onClick={() => navigate('/community')}>
-                        💬 Browse Community Channels →
-                    </button>
-                </div>
+                {/* Guest CTA — only shown on the email step */}
+                {step === 'email' && (
+                    <div id="signup-guest-cta">
+                        <div id="signup-divider"><span>or</span></div>
+                        <button id="guestBtn" onClick={handleGuest}>
+                            👀 Try as Guest — 1 free call, no signup
+                        </button>
+                        <p id="guest-cta-note">No email needed · Just jump right in</p>
+                    </div>
+                )}
             </div>
         </div>
     )

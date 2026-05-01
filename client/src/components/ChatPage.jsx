@@ -66,6 +66,11 @@ export default function ChatPage({ username, setUsername }) {
         }
     }, [socket])
 
+    // Auto-show prompt sent with the match payload
+    useEffect(() => {
+        if (strangerdata?.prompt) setActivePrompt(strangerdata.prompt)
+    }, [strangerdata])
+
     // Clear prompt + report state when partner changes
     useEffect(() => {
         setActivePrompt(null)
@@ -263,6 +268,7 @@ export default function ChatPage({ username, setUsername }) {
                 <UpgradeModal
                     currentTier={userTier}
                     onClose={() => setShowUpgrade(false)}
+                    onTierChange={(tier) => { setUserTier(tier); setShowUpgrade(false) }}
                 />
             )}
         </div>

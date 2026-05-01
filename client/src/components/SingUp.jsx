@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import ABCVerificationModal from "../assets/ui/ABCVerificationModal"
 
 const API = import.meta.env.VITE_APP_WEBSOCKET_URL   // http://localhost:3000
 
@@ -212,9 +213,10 @@ function StepOtp({ email, username, onVerified, onBack }) {
 // ── Main SignUp component ─────────────────────────────────────
 export default function SingUp({ setUsername }) {
     const navigate = useNavigate()
-    const [step,        setStep]        = useState('email')   // 'email' | 'otp'
+    const [step,        setStep]        = useState('email')   // 'email' | 'otp' | 'abc'
     const [pendingEmail, setPendingEmail] = useState('')
     const [pendingName,  setPendingName]  = useState('')
+    const [pendingToken, setPendingToken] = useState(null)
 
     // Auto-login if valid JWT already stored
     useEffect(() => {
@@ -240,9 +242,16 @@ export default function SingUp({ setUsername }) {
     }
 
     function handleVerified(token, username) {
-        localStorage.setItem('rt_token', token)
         localStorage.removeItem('rt_guest')  // clear guest flag if they sign up
-        setUsername(username)
+        setPendingToken(token)
+        // Show ABC ID step — user can skip it; token stored after they proceed
+        setStep('abc')
+    }
+
+    function proceedToChat(token) {
+        const t = token || pendingToken
+        localStorage.setItem('rt_token', t)
+        setUsername(pendingName)
         navigate('/chat')
     }
 
@@ -256,6 +265,18 @@ export default function SingUp({ setUsername }) {
         setUsername(name)
         navigate('/chat')
     }
+
+    // ABC step renders as a full-screen overlay on top of signup page
+    if (step === 'abc') return (
+        <div id="signupPage">
+            <div id="signup-glow"></div>
+            <ABCVerificationModal
+                token={pendingToken}
+                onVerified={() => proceedToChat()}
+                onSkip={() => proceedToChat()}
+            />
+        </div>
+    )
 
     return (
         <div id="signupPage">
@@ -271,9 +292,10 @@ export default function SingUp({ setUsername }) {
                     One stranger. Real talk. Your college.
                 </p>
 
-                {step === 'email' ? (
+                {step === 'email' && (
                     <StepEmail onOtpSent={handleOtpSent} />
-                ) : (
+                )}
+                {step === 'otp' && (
                     <StepOtp
                         email={pendingEmail}
                         username={pendingName}

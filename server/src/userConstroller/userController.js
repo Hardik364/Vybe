@@ -5,6 +5,17 @@ import { getSelfQueue } from "../utils/tierMatching.js";
 import { updateStatus } from "../userRegistry.js";
 import { recordPartnership } from "../partnerships.js";
 import { sendCollegeNotifications } from "../pushNotify.js";
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname  = dirname(__filename)
+const _prompts   = JSON.parse(readFileSync(join(__dirname, '../data/prompts.json'), 'utf8'))
+
+function pickPrompt() {
+    return _prompts[Math.floor(Math.random() * _prompts.length)]
+}
 
 // Broadcast waiting count for this socket's college queue
 export async function emitLiveCount(io, socket) {
@@ -58,10 +69,13 @@ export async function processUserPairing(io, socket) {
             updateStatus(userPair[1].socketId, 'in-call', userPair[0].socketId, userPair[0].username)
             // Record partnership so rateUser / reportUser can verify both were in a call
             recordPartnership(userPair[0].socketId, userPair[1].socketId)
+            // Pick one prompt — both users see the same one on match
+            const matchPrompt = pickPrompt()
+
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
                 if (s) s.leave(room)
-                io.to(key.socketId).emit("getStragerData", key)
+                io.to(key.socketId).emit("getStragerData", { ...key, prompt: matchPrompt })
             })
             emitLiveCount(io, socket)
         }

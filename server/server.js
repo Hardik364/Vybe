@@ -9,7 +9,8 @@ import { handelSocketConnection } from "./src/socketRoutes.js";
 import authRoutes from "./src/authRoutes.js";
 import adminRoutes from "./src/adminRoutes.js";
 import communityRoutes from "./src/communityRoutes.js";
-import apiRoutes from "./src/apiRoutes.js";
+import apiRoutes      from "./src/apiRoutes.js";
+import paymentRoutes  from "./src/paymentRoutes.js";
 import 'dotenv/config'
 
 const app = express();
@@ -107,6 +108,7 @@ app.locals.io = io          // give admin routes access to io
 app.use('/admin', adminRoutes)
 app.use('/community', communityRoutes)
 app.use('/api', apiRoutes)
+app.use('/payments', paymentRoutes)
 
 // Stats — protect with a simple token in production
 app.get('/stats', async (req, res) => {

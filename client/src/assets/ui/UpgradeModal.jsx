@@ -1,58 +1,80 @@
+import { useState } from 'react'
+import CheckoutModal from './CheckoutModal'
+
 const TIERS = [
     {
-        id:      'free',
-        name:    'Free',
-        price:   '₹0',
-        period:  'forever',
-        scope:   '🏫 Your college only',
-        color:   '#A0A0A0',
-        features: [
+        id:        'free',
+        name:      'Free',
+        price:     '₹0',
+        period:    'forever',
+        scope:     '🏫 Your college only',
+        color:     '#A0A0A0',
+        features:  [
             'Match within your college',
-            'Voice + text chat',
-            'Conversation prompts',
+            'Voice + video chat',
+            'Conversation prompts on match',
             'Karma protection system',
         ],
-        cta:     null,   // current plan — no button
+        plans:     [],
     },
     {
-        id:      'plus',
-        name:    'Plus',
-        price:   '₹49',
-        period:  '/month',
-        scope:   '🏙️ Same city colleges',
-        color:   '#6C63FF',
-        features: [
+        id:        'plus',
+        name:      'Plus',
+        price:     '₹49',
+        period:    '/month',
+        scope:     '🏙️ Same city colleges',
+        color:     '#6C63FF',
+        features:  [
             'Everything in Free',
             'Match across your city',
-            'Priority matching',
-            'Day Pass: ₹19',
+            'Priority matching queue',
         ],
-        cta:     'Coming Soon',
+        plans: [
+            { planId: 'day-pass',     label: '₹19  Day Pass'   },
+            { planId: 'plus-monthly', label: '₹49 / month'     },
+        ],
     },
     {
-        id:      'pro',
-        name:    'Pro',
-        price:   '₹99',
-        period:  '/month',
-        scope:   '🌍 Any college globally',
-        color:   '#F59E0B',
-        features: [
+        id:        'pro',
+        name:      'Pro',
+        price:     '₹99',
+        period:    '/month',
+        scope:     '🌍 Any college globally',
+        color:     '#F59E0B',
+        features:  [
             'Everything in Plus',
             'Match any college worldwide',
-            'Week Pass: ₹49',
             'Early access to features',
         ],
-        cta:     'Coming Soon',
+        plans: [
+            { planId: 'week-pass',   label: '₹49  Week Pass'  },
+            { planId: 'pro-monthly', label: '₹99 / month'     },
+        ],
     },
 ]
 
-export default function UpgradeModal({ currentTier = 'free', onClose }) {
+export default function UpgradeModal({ currentTier = 'free', onClose, onTierChange }) {
+    const [checkoutPlan, setCheckoutPlan] = useState(null)
+
+    function handleSuccess(tier) {
+        setCheckoutPlan(null)
+        onTierChange?.(tier)
+    }
+
+    if (checkoutPlan) return (
+        <CheckoutModal
+            selectedPlan={checkoutPlan}
+            onSuccess={handleSuccess}
+            onClose={() => setCheckoutPlan(null)}
+        />
+    )
+
     return (
         <div id="upgradeOverlay" onClick={onClose}>
             <div id="upgradeModal" onClick={e => e.stopPropagation()}>
                 <div id="upgrade-header">
                     <h2 id="upgrade-title">Choose Your Plan</h2>
-                    <p id="upgrade-subtitle">Expand your reach when you're ready</p>
+                    <p id="upgrade-subtitle">Expand your reach — cancel anytime</p>
                     <button id="upgrade-close" onClick={onClose}>✕</button>
                 </div>
 
@@ -62,7 +84,7 @@ export default function UpgradeModal({ currentTier = 'free', onClose }) {
                         return (
                             <div
                                 key={tier.id}
-                                className={`upgrade-card ${isCurrent ? 'current' : ''} ${tier.id === 'plus' ? 'featured' : ''}`}
+                                className={`upgrade-card${isCurrent ? ' current' : ''}${tier.id === 'plus' ? ' featured' : ''}`}
                                 style={{ '--tier-color': tier.color }}
                             >
                                 {tier.id === 'plus' && (
@@ -72,9 +94,7 @@ export default function UpgradeModal({ currentTier = 'free', onClose }) {
                                     <div className="tier-current-badge">Your Plan</div>
                                 )}
 
-                                <div className="tier-name" style={{ color: tier.color }}>
-                                    {tier.name}
-                                </div>
+                                <div className="tier-name" style={{ color: tier.color }}>{tier.name}</div>
                                 <div className="tier-price">
                                     <span className="tier-price-amount">{tier.price}</span>
                                     <span className="tier-price-period">{tier.period}</span>
@@ -89,14 +109,32 @@ export default function UpgradeModal({ currentTier = 'free', onClose }) {
                                     ))}
                                 </ul>
 
-                                {tier.cta ? (
-                                    <button className="tier-cta coming-soon" disabled>
-                                        {tier.cta}
+                                {/* Plan buttons */}
+                                {isCurrent ? (
+                                    <button className="tier-cta active-plan" disabled>✓ Active Plan</button>
+                                ) : tier.plans.length === 0 ? (
+                                    <button className="tier-cta active-plan" disabled>Always Free</button>
+                                ) : tier.plans.length === 1 ? (
+                                    <button
+                                        className="tier-cta"
+                                        style={{ background: tier.color }}
+                                        onClick={() => setCheckoutPlan(tier.plans[0].planId)}
+                                    >
+                                        {tier.plans[0].label} →
                                     </button>
                                 ) : (
-                                    <button className="tier-cta active-plan" disabled>
-                                        ✓ Active Plan
-                                    </button>
+                                    <div className="tier-plan-btns">
+                                        {tier.plans.map(p => (
+                                            <button
+                                                key={p.planId}
+                                                className="tier-plan-btn"
+                                                style={{ '--btn-color': tier.color }}
+                                                onClick={() => setCheckoutPlan(p.planId)}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
                         )
@@ -104,7 +142,7 @@ export default function UpgradeModal({ currentTier = 'free', onClose }) {
                 </div>
 
                 <p id="upgrade-note">
-                    💡 RealTalk is free during launch — tell your friends and help us grow!
+                    💡 UPI · Cards · NetBanking · No auto-renew for passes
                 </p>
             </div>
         </div>

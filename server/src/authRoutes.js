@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -135,6 +136,65 @@ router.get('/me', async (req, res) => {
         res.json({ valid: true, username: user.username, email: user.email, collegeDomain: user.collegeDomain, tier })
     } catch {
         res.status(401).json({ valid: false, error: 'Token expired or invalid' })
+    }
+})
+
+// ── POST /auth/verify-abc ─────────────────────────────────────
+// Validates ABC (Academic Bank of Credits) ID — 12-digit number.
+// In development: stores as 'pending' (no real API call).
+// In production: wire up to DigiLocker / NATS API for real verification.
+router.post('/verify-abc', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) return res.status(401).json({ error: 'Login required' })
+
+    let user
+    try { user = jwt.verify(token, process.env.JWT_SECRET) }
+    catch { return res.status(401).json({ error: 'Token invalid' }) }
+
+    const { abcId } = req.body
+    if (!abcId) return res.status(400).json({ error: 'ABC ID required' })
+
+    // Basic format validation — 12 digits
+    const cleaned = abcId.replace(/\s/g, '')
+    if (!/^\d{12}$/.test(cleaned)) {
+        return res.status(400).json({ error: 'ABC ID must be a 12-digit number' })
+    }
+
+    try {
+        const existing = await client.get(`abc:${user.email}`)
+        if (existing === 'verified') {
+            return res.json({ status: 'verified', message: 'Already verified' })
+        }
+
+        // TODO: wire to real ABC / DigiLocker API in production
+        //   const result = await verifyWithDigiLocker(cleaned, user.email)
+        //   if (!result.valid) return res.status(400).json({ error: result.reason })
+        //   if (result.age < 18) return res.status(403).json({ error: 'Must be 18+ to use RealTalk' })
+
+        // Store ABC ID hash (never store raw) + pending status
+        const hash = crypto.createHash('sha256').update(cleaned).digest('hex')
+        await client.set(`abc:${user.email}`, 'pending')
+        await client.set(`abc-hash:${user.email}`, hash)
+
+        console.log(`[ABC] Submitted for ${user.email} — pending verification`)
+        res.json({ status: 'pending', message: 'Verification submitted. Approved within 24h.' })
+    } catch (err) {
+        console.error('[verify-abc]', err)
+        res.status(500).json({ error: err.message })
+    }
+})
+
+// ── GET /auth/abc-status ──────────────────────────────────────
+router.get('/abc-status', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) return res.status(401).json({ error: 'Login required' })
+
+    try {
+        const user   = jwt.verify(token, process.env.JWT_SECRET)
+        const status = await client.get(`abc:${user.email}`) || 'none'
+        res.json({ status })  // 'none' | 'pending' | 'verified'
+    } catch {
+        res.status(401).json({ error: 'Token invalid' })
     }
 })
 

@@ -4,6 +4,7 @@ import SingUp from "./SingUp";
 import ChatPage from "./ChatPage";
 import AdminDashboard from "./AdminDashboard";
 import CommunityPage from "./CommunityPage";
+import AccountPage from "./AccountPage";
 import { initIceServers } from "../utils/pcInstance";
 
 function App() {
@@ -41,6 +42,10 @@ function App() {
     {
       path: '/community',
       element: <CommunityPage username={username} />
+    },
+    {
+      path: '/account',
+      element: <AccountPage />
     }
   ]);
 

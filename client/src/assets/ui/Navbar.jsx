@@ -50,6 +50,10 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
                     🎲 Prompts
                 </button>
 
+                <button id="accountBtn" onClick={() => navigate('/account')} title="Account & subscription">
+                    👤
+                </button>
+
                 <button id="logoutBtn" onClick={handleLogout} title="Log out">
                     ⏏︎
                 </button>

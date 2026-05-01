@@ -9,6 +9,7 @@ const client = createClient({
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379'),
         tls:  process.env.REDIS_TLS === 'true',   // set REDIS_TLS=true on Upstash
+        family: 4,   // force IPv4 — Render free tier does not support IPv6
         // Reconnect on drops — important for long-running production servers
         reconnectStrategy: (retries) => {
             if (retries > 10) {

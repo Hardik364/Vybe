@@ -136,14 +136,16 @@ app.get('/stats', async (req, res) => {
   }
   try {
     const connectedSockets = io.engine.clientsCount
-    const shadowBanned     = await client.sCard('shadowBanned')
-    const suspended        = await client.sCard('suspended')
-    const bannedEmails     = await client.sCard('banned:emails')
+    const shadowBanned        = await client.sCard('shadowBanned')
+    const shadowBannedEmails  = await client.sCard('shadowBanned:emails')
+    const suspended           = await client.sCard('suspended')
+    const bannedEmails        = await client.sCard('banned:emails')
 
     res.json({
       live: {
-        connected:    connectedSockets,
+        connected:           connectedSockets,
         shadowBanned,
+        shadowBannedEmails,   // persistent across reconnects
         suspended,
         bannedEmails,
       },

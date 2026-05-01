@@ -41,6 +41,23 @@ export async function processUserPairing(io, socket) {
             }
         }
 
+        // ── Load tier + shadow ban BEFORE makePair so queue routing is correct ──
+        // socket.tier and socket.shadowBanned are used by getMatchQueues / getSelfQueue.
+        // We must resolve them here so every matchmaking path has the right values.
+        if (!socket.tier) {
+            if (socket.email) {
+                const [tier, shadowByEmail] = await Promise.all([
+                    client.get(`tier:${socket.email}`),
+                    client.sIsMember('shadowBanned:emails', socket.email),
+                ])
+                socket.tier        = tier || 'free'
+                socket.shadowBanned = shadowByEmail || (await client.sIsMember('shadowBanned', socket.id))
+            } else {
+                socket.tier        = 'free'
+                socket.shadowBanned = await client.sIsMember('shadowBanned', socket.id)
+            }
+        }
+
         // Try to find a match across tier-appropriate queues
         const userPair = await makePair(socket)
 

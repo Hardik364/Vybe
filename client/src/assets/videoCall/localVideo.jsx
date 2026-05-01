@@ -1,11 +1,11 @@
 // localVideo.jsx — local camera/mic controls
 //
-// Video is audio-first: camera starts OFF.
-// Each user independently controls their own camera.
-// Pressing "Enable Video" turns YOUR camera on immediately —
-// no waiting for the other person.
+// Voice-first: microphone starts immediately, camera stays OFF.
+// Pressing "Enable Video" requests camera permission and adds the
+// video track to the existing peer connection (triggers renegotiation).
+// This means NO camera LED until the user explicitly opts in.
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import openMediaStream from "../../utils/openMediaStream"
 
 export default function LocalVideo({
@@ -13,27 +13,30 @@ export default function LocalVideo({
     selectedDeviceId, socket, strangerUserId
 }) {
     const [videoEnabled,   setVideoEnabled]   = useState(false)
-    const [partnerVideoOn, setPartnerVideoOn] = useState(false) // partner's camera status
+    const [partnerVideoOn, setPartnerVideoOn] = useState(false)
+    const [videoLoading,   setVideoLoading]   = useState(false)
 
-    // ── Open media stream: audio-only by default ─────────────
+    // Track the video sender so we can replace/remove the track later
+    const videoSenderRef = useRef(null)
+
+    // ── Open audio-only stream on mount ─────────────────────────
     useEffect(() => {
         if (!peerConnection) return
         let streamInstance = null
 
         async function initStream() {
             try {
-                streamInstance = await openMediaStream(selectedDeviceId)
-                // Voice-first: disable video track on start
-                streamInstance.getVideoTracks().forEach(t => { t.enabled = false })
+                // Audio only — no camera permission requested at start
+                streamInstance = await openMediaStream(null, true)
                 if (localVideo.current) localVideo.current.srcObject = streamInstance
                 setStream(streamInstance)
                 setVideoEnabled(false)
             } catch (err) {
-                console.error('[LocalVideo] Media stream error:', err.name, err.message)
+                console.error('[LocalVideo] Audio stream error:', err.name, err.message)
             }
         }
 
-        if (localVideo.current) initStream()
+        initStream()
 
         return () => {
             if (streamInstance) streamInstance.getTracks().forEach(t => t.stop())
@@ -51,21 +54,65 @@ export default function LocalVideo({
         }
     }, [socket])
 
-    // Reset when partner changes (new match)
+    // Reset video when partner changes (new match)
     useEffect(() => {
-        setVideoEnabled(false)
+        if (!strangerUserId) return
         setPartnerVideoOn(false)
-        if (stream) stream.getVideoTracks().forEach(t => { t.enabled = false })
+
+        // Turn off video if it was on from the previous call
+        if (videoEnabled && stream) {
+            stream.getVideoTracks().forEach(t => { t.stop(); t.enabled = false })
+            if (videoSenderRef.current) {
+                try { peerConnection?.removeTrack(videoSenderRef.current) } catch {}
+                videoSenderRef.current = null
+            }
+            setVideoEnabled(false)
+        }
     }, [strangerUserId])
 
     // ── Toggle your own camera ────────────────────────────────
-    function handleToggleVideo() {
+    async function handleToggleVideo() {
         if (!socket || !strangerUserId || !stream) return
 
-        const next = !videoEnabled
-        stream.getVideoTracks().forEach(t => { t.enabled = next })
-        setVideoEnabled(next)
-        socket.emit(next ? 'videoOn' : 'videoOff', { to: strangerUserId })
+        if (videoEnabled) {
+            // Turn OFF: stop tracks and remove from peer connection
+            stream.getVideoTracks().forEach(t => { t.stop(); stream.removeTrack(t) })
+            if (videoSenderRef.current) {
+                try { peerConnection?.removeTrack(videoSenderRef.current) } catch {}
+                videoSenderRef.current = null
+            }
+            if (localVideo.current) localVideo.current.srcObject = stream
+            setVideoEnabled(false)
+            socket.emit('videoOff', { to: strangerUserId })
+        } else {
+            // Turn ON: request camera permission and add track to peer connection
+            setVideoLoading(true)
+            try {
+                const videoStream = await openMediaStream(selectedDeviceId, false)
+                const videoTrack  = videoStream.getVideoTracks()[0]
+                if (!videoTrack) throw new Error('No video track obtained')
+
+                // Add video track to the existing audio stream so <video> shows both
+                stream.addTrack(videoTrack)
+                if (localVideo.current) localVideo.current.srcObject = stream
+
+                // Add to peer connection — triggers renegotiation automatically
+                if (peerConnection) {
+                    videoSenderRef.current = peerConnection.addTrack(videoTrack, stream)
+                }
+
+                setVideoEnabled(true)
+                socket.emit('videoOn', { to: strangerUserId })
+            } catch (err) {
+                console.error('[LocalVideo] Enable video failed:', err.name, err.message)
+                // Camera denied or not available — show a friendly message
+                if (err.name === 'NotAllowedError') {
+                    alert('Camera access denied. Please allow camera access in your browser settings.')
+                }
+            } finally {
+                setVideoLoading(false)
+            }
+        }
     }
 
     return (
@@ -77,7 +124,7 @@ export default function LocalVideo({
                 autoPlay playsInline controls={false} muted
             />
 
-            {/* Partner video indicator — subtle badge when they're on camera */}
+            {/* Partner video indicator */}
             {partnerVideoOn && !videoEnabled && (
                 <div id="partner-video-badge">📷 Partner is on video</div>
             )}
@@ -86,10 +133,15 @@ export default function LocalVideo({
                 id="videoConsentBtn"
                 className={videoEnabled ? 'video-on' : 'video-off'}
                 onClick={handleToggleVideo}
-                disabled={!strangerUserId}
+                disabled={!strangerUserId || videoLoading}
                 title={videoEnabled ? 'Turn off your camera' : 'Turn on your camera'}
             >
-                {videoEnabled ? '📷 Camera On' : '📷 Enable Video'}
+                {videoLoading
+                    ? '⏳ Starting...'
+                    : videoEnabled
+                        ? '📷 Camera On'
+                        : '📷 Enable Video'
+                }
             </button>
         </div>
     )

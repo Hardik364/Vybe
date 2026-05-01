@@ -234,8 +234,15 @@ export function handelSocketConnection(io, socket) {
             const total = parseInt(karma.total || 0)
             const bad   = parseInt(karma.disrespectful || 0)
             if (total >= 5 && bad / total > 0.2) {
+                // Shadow-ban by socket ID (current session) AND by email (persistent)
                 await client.sAdd('shadowBanned', to)
-                console.log(`[Karma] Shadow-banned ${to} (${bad}/${total} disrespectful)`)
+                const targetSocket = io.sockets.sockets.get(to)
+                if (targetSocket?.email) {
+                    await client.sAdd('shadowBanned:emails', targetSocket.email)
+                    console.log(`[Karma] Shadow-banned ${targetSocket.email} (${bad}/${total} disrespectful)`)
+                } else {
+                    console.log(`[Karma] Shadow-banned socket ${to} (${bad}/${total} disrespectful)`)
+                }
             }
         } catch (err) {
             console.error('[rateUser]', err)

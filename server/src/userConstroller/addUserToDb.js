@@ -3,9 +3,15 @@ import { getSelfQueue } from "../utils/tierMatching.js";
 
 export default async function addUserTODb(socket) {
     try {
-        // Check shadow ban status and attach to socket
-        const isShadowBanned = await client.sIsMember('shadowBanned', socket.id)
-        socket.shadowBanned  = isShadowBanned
+        // Check shadow ban: by email (persistent across reconnects) or by socket ID (legacy)
+        let isShadowBanned = false
+        if (socket.email) {
+            isShadowBanned = await client.sIsMember('shadowBanned:emails', socket.email)
+        }
+        if (!isShadowBanned) {
+            isShadowBanned = await client.sIsMember('shadowBanned', socket.id)
+        }
+        socket.shadowBanned = isShadowBanned
 
         // Get tier from Redis (set when user upgrades; default = 'free')
         if (socket.email) {

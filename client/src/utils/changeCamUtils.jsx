@@ -13,9 +13,12 @@ export async function changeCam(setChangeCamOverly, selectedDeviceId, localVideo
             localVideo.srcObject = stream;
             setStream(stream);
             const newVideoTrack = stream.getVideoTracks()[0];
-            const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+            const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
             if (sender) {
                 await sender.replaceTrack(newVideoTrack);
+            } else {
+                // No video sender yet — add the track (first-time video enable via cam switcher)
+                peerConnection.addTrack(newVideoTrack, stream);
             }
         } catch (error) {
             console.error("Error changing camera:", error);
@@ -25,7 +28,7 @@ export async function changeCam(setChangeCamOverly, selectedDeviceId, localVideo
 
 export async function changePreviewCam(deviceId, videoPreview, setStream) {
     try {
-        const stream = await openMediaStream(deviceId, videoPreview);
+        const stream = await openMediaStream(deviceId);
         stream && setStream(stream);
         if (videoPreview.current) {
             videoPreview.current.srcObject = stream;

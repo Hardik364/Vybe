@@ -91,7 +91,7 @@ export default function ABCVerificationModal({ token, onVerified, onSkip }) {
                 <h3 className="abc-modal-title">Verification Pending</h3>
                 <p className="abc-modal-body">
                     Your ABC ID is under review. You'll receive a notification once approved (within 24h).
-                    You can continue using RealTalk while we verify.
+                    You can continue using UniBuddy while we verify.
                 </p>
                 <button className="abc-primary-btn" onClick={onSkip}>Continue for now →</button>
             </div>
@@ -105,7 +105,7 @@ export default function ABCVerificationModal({ token, onVerified, onSkip }) {
                 <div className="abc-modal-header">
                     <h3 className="abc-modal-title">Verify Your Age & Enrollment</h3>
                     <p className="abc-modal-subtitle">
-                        RealTalk is for college students aged 18+. Your ABC ID confirms both.
+                        UniBuddy is for college students aged 18+. Your ABC ID confirms both.
                     </p>
                 </div>
 

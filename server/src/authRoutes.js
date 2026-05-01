@@ -169,7 +169,7 @@ router.post('/verify-abc', async (req, res) => {
         // TODO: wire to real ABC / DigiLocker API in production
         //   const result = await verifyWithDigiLocker(cleaned, user.email)
         //   if (!result.valid) return res.status(400).json({ error: result.reason })
-        //   if (result.age < 18) return res.status(403).json({ error: 'Must be 18+ to use RealTalk' })
+        //   if (result.age < 18) return res.status(403).json({ error: 'Must be 18+ to use UniBuddy' })
 
         // Store ABC ID hash (never store raw) + pending status
         const hash = crypto.createHash('sha256').update(cleaned).digest('hex')

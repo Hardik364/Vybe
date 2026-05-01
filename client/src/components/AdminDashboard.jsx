@@ -119,7 +119,7 @@ export default function AdminDashboard() {
                 borderRadius: 16, padding: 40, width: 360, textAlign: 'center'
             }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
-                    <span style={{ color: '#6C63FF' }}>✦</span> RealTalk Admin
+                    <span style={{ color: '#6C63FF' }}>✦</span> UniBuddy Admin
                 </div>
                 <p style={{ color: '#555', fontSize: 13, marginBottom: 24 }}>Super Admin Dashboard</p>
                 {error && <p style={{ color: '#EF4444', marginBottom: 12, fontSize: 13 }}>{error}</p>}
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
                 justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50
             }}>
                 <div style={{ fontWeight: 800, fontSize: 18 }}>
-                    <span style={{ color: '#6C63FF' }}>✦</span> RealTalk <span style={{ color: '#555', fontWeight: 400 }}>Super Admin</span>
+                    <span style={{ color: '#6C63FF' }}>✦</span> UniBuddy <span style={{ color: '#555', fontWeight: 400 }}>Super Admin</span>
                 </div>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                     <div style={{ color: '#555', fontSize: 12 }}>

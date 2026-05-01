@@ -1,44 +1,51 @@
+// tierMatching.js — controls which Redis queues are searched per tier
+//
+// Free:  only own university queue             users:{domain}
+// Plus:  own uni → all unis in same state
+// Pro:   own uni → same state → global pool
+//
+// Shadow-banned users get separate prefix so they only match each other.
+
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
-const cityMap    = JSON.parse(readFileSync(join(__dirname, '../data/cityMap.json'), 'utf8'))
+const stateMap   = JSON.parse(readFileSync(join(__dirname, '../data/stateMap.json'), 'utf8'))
 
-// Build reverse map: domain → city
-const domainToCity = {}
-for (const [city, domains] of Object.entries(cityMap)) {
+// Build reverse map: domain → state name
+const domainToState = {}
+for (const [state, domains] of Object.entries(stateMap)) {
     for (const domain of domains) {
-        domainToCity[domain] = city
+        domainToState[domain] = state
     }
 }
 
-export function getCityForDomain(domain) {
-    return domainToCity[domain] || null
+export function getStateForDomain(domain) {
+    return domainToState[domain] || null
 }
 
-// Returns ordered list of queue keys to try when finding a match
-// First match found wins — ensures tighter matches are preferred
+// Returns ordered list of queue keys to try when finding a match.
+// First match found wins — tighter scopes are always tried first.
 export function getMatchQueues(socket) {
     const domain = socket.collegeDomain || 'global'
     const tier   = socket.tier          || 'free'
     const shadow = socket.shadowBanned
-
     const prefix = shadow ? 'users:shadow' : 'users'
 
     if (tier === 'free') {
-        // Only match within own college
+        // Free: only own university
         return [`${prefix}:${domain}`]
     }
 
     if (tier === 'plus') {
-        // Try own college first, then rest of city
-        const city = getCityForDomain(domain)
+        // Plus: own uni first, then all other unis in the same state
+        const state  = getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
-        if (city) {
-            const cityDomains = cityMap[city] || []
-            for (const d of cityDomains) {
+        if (state) {
+            const stateDomains = stateMap[state] || []
+            for (const d of stateDomains) {
                 if (d !== domain) queues.push(`${prefix}:${d}`)
             }
         }
@@ -46,12 +53,12 @@ export function getMatchQueues(socket) {
     }
 
     if (tier === 'pro') {
-        // Try own college → city → global
-        const city = getCityForDomain(domain)
+        // Pro: own uni → same state → global pool
+        const state  = getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
-        if (city) {
-            const cityDomains = cityMap[city] || []
-            for (const d of cityDomains) {
+        if (state) {
+            const stateDomains = stateMap[state] || []
+            for (const d of stateDomains) {
                 if (d !== domain) queues.push(`${prefix}:${d}`)
             }
         }
@@ -62,7 +69,7 @@ export function getMatchQueues(socket) {
     return [`${prefix}:${domain}`]
 }
 
-// Returns the self-registration queue key (where this user waits)
+// Where this socket registers itself to wait
 export function getSelfQueue(socket) {
     const domain = socket.collegeDomain || 'global'
     const shadow = socket.shadowBanned
@@ -76,44 +83,44 @@ export const TIERS = {
         name:     'Free',
         price:    '₹0',
         period:   'forever',
-        scope:    'Your college only',
+        scope:    'Your university only',
         color:    '#A0A0A0',
         features: [
-            'Match with your college',
-            'Voice + text chat',
-            'Conversation prompts',
-            'Karma system',
+            'Match within your university',
+            'Voice + video chat',
+            'Conversation prompts on match',
+            'Karma protection system',
         ],
-        cta:      'Current Plan',
+        cta: 'Current Plan',
     },
     plus: {
         id:       'plus',
         name:     'Plus',
         price:    '₹49',
         period:   '/month',
-        scope:    'Same city colleges',
+        scope:    'Same state universities',
         color:    '#6C63FF',
         features: [
             'Everything in Free',
-            'Match across your city',
-            'Priority matching',
+            'Match across your state',
+            'Priority matching queue',
             'Day Pass available (₹19)',
         ],
-        cta:      'Coming Soon',
+        cta: 'Upgrade',
     },
     pro: {
         id:       'pro',
         name:     'Pro',
         price:    '₹99',
         period:   '/month',
-        scope:    'Any college globally',
+        scope:    'Any university in India & globally',
         color:    '#F59E0B',
         features: [
             'Everything in Plus',
-            'Match any college worldwide',
+            'Match any university worldwide',
             'Week Pass available (₹49)',
             'Early access to new features',
         ],
-        cta:      'Coming Soon',
+        cta: 'Upgrade',
     },
 }

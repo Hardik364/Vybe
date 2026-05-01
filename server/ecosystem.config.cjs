@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name:         'realtalk-server',
+    name:         'unibuddy-server',
     script:       'server.js',
     instances:    1,              // Socket.IO needs sticky sessions for multi-instance
     exec_mode:    'fork',

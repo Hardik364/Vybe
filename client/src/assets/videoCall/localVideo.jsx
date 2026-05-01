@@ -1,132 +1,72 @@
-import React, { useEffect, useState, useRef } from "react"
-import openMediaStream from "../../utils/openMediaStream"
+// localVideo.jsx — local camera/mic controls
+//
+// Video is audio-first: camera starts OFF.
+// Each user independently controls their own camera.
+// Pressing "Enable Video" turns YOUR camera on immediately —
+// no waiting for the other person.
 
-const CONSENT_TIMEOUT_MS = 10000  // 10 seconds — reset if partner doesn't respond
+import { useEffect, useState } from "react"
+import openMediaStream from "../../utils/openMediaStream"
 
 export default function LocalVideo({
     localVideo, peerConnection, setChangeCamOverly, setStream, stream,
     selectedDeviceId, socket, strangerUserId
 }) {
-    const [videoEnabled,      setVideoEnabled]      = useState(false)
-    const [partnerWantsVideo, setPartnerWantsVideo] = useState(false)
-    const [consentPending,    setConsentPending]    = useState(false) // waiting for partner
-    const consentTimerRef = useRef(null)
+    const [videoEnabled,   setVideoEnabled]   = useState(false)
+    const [partnerVideoOn, setPartnerVideoOn] = useState(false) // partner's camera status
 
     // ── Open media stream: audio-only by default ─────────────
     useEffect(() => {
-        if (peerConnection) {
-            let streamInstance = null
-            async function handelMediaStream() {
-                try {
-                    streamInstance = await openMediaStream(selectedDeviceId)
-                    // Voice-first: disable video track immediately
-                    streamInstance.getVideoTracks().forEach(t => { t.enabled = false })
-                    if (localVideo.current) localVideo.current.srcObject = streamInstance
-                    setStream(streamInstance)
-                    setVideoEnabled(false)
-                } catch (err) {
-                    console.error('[LocalVideo] Failed to open media stream:', err.name, err.message)
-                }
-            }
-            if (localVideo.current) handelMediaStream()
+        if (!peerConnection) return
+        let streamInstance = null
 
-            return () => {
-                if (streamInstance) {
-                    streamInstance.getTracks().forEach(t => t.stop())
-                }
+        async function initStream() {
+            try {
+                streamInstance = await openMediaStream(selectedDeviceId)
+                // Voice-first: disable video track on start
+                streamInstance.getVideoTracks().forEach(t => { t.enabled = false })
+                if (localVideo.current) localVideo.current.srcObject = streamInstance
+                setStream(streamInstance)
+                setVideoEnabled(false)
+            } catch (err) {
+                console.error('[LocalVideo] Media stream error:', err.name, err.message)
             }
+        }
+
+        if (localVideo.current) initStream()
+
+        return () => {
+            if (streamInstance) streamInstance.getTracks().forEach(t => t.stop())
         }
     }, [peerConnection])
 
-    // ── Listen for partner video consent events ──────────────
+    // ── Partner video status events ───────────────────────────
     useEffect(() => {
         if (!socket) return
-
-        socket.on('partnerWantsVideo', () => setPartnerWantsVideo(true))
-
-        socket.on('partnerTurnedOffVideo', () => {
-            setPartnerWantsVideo(false)
-        })
-
-        socket.on('videoBothConsented', () => {
-            // Both consented — enable video track
-            clearConsentTimer()
-            setConsentPending(false)
-            if (stream) {
-                stream.getVideoTracks().forEach(t => { t.enabled = true })
-                setVideoEnabled(true)
-            }
-        })
-
-        socket.on('videoDisabled', () => {
-            clearConsentTimer()
-            setConsentPending(false)
-            if (stream) {
-                stream.getVideoTracks().forEach(t => { t.enabled = false })
-                setVideoEnabled(false)
-            }
-        })
-
+        socket.on('partnerVideoOn',  () => setPartnerVideoOn(true))
+        socket.on('partnerVideoOff', () => setPartnerVideoOn(false))
         return () => {
-            socket.off('partnerWantsVideo')
-            socket.off('partnerTurnedOffVideo')
-            socket.off('videoBothConsented')
-            socket.off('videoDisabled')
+            socket.off('partnerVideoOn')
+            socket.off('partnerVideoOff')
         }
-    }, [socket, stream])
+    }, [socket])
 
-    // Reset video consent when partner changes
+    // Reset when partner changes (new match)
     useEffect(() => {
-        clearConsentTimer()
         setVideoEnabled(false)
-        setPartnerWantsVideo(false)
-        setConsentPending(false)
+        setPartnerVideoOn(false)
         if (stream) stream.getVideoTracks().forEach(t => { t.enabled = false })
     }, [strangerUserId])
 
-    function clearConsentTimer() {
-        if (consentTimerRef.current) {
-            clearTimeout(consentTimerRef.current)
-            consentTimerRef.current = null
-        }
-    }
-
+    // ── Toggle your own camera ────────────────────────────────
     function handleToggleVideo() {
-        if (!socket || !strangerUserId) return
+        if (!socket || !strangerUserId || !stream) return
 
-        if (videoEnabled) {
-            // Turn off
-            if (stream) stream.getVideoTracks().forEach(t => { t.enabled = false })
-            setVideoEnabled(false)
-            setConsentPending(false)
-            clearConsentTimer()
-            socket.emit('videoConsentOff', { to: strangerUserId })
-        } else if (consentPending) {
-            // Cancel pending request
-            setConsentPending(false)
-            clearConsentTimer()
-            socket.emit('videoConsentOff', { to: strangerUserId })
-        } else {
-            // Request consent — start 10s timeout
-            setConsentPending(true)
-            socket.emit('videoConsentOn', { to: strangerUserId })
-            consentTimerRef.current = setTimeout(() => {
-                // Partner didn't respond in time — reset silently
-                setConsentPending(false)
-                consentTimerRef.current = null
-            }, CONSENT_TIMEOUT_MS)
-        }
+        const next = !videoEnabled
+        stream.getVideoTracks().forEach(t => { t.enabled = next })
+        setVideoEnabled(next)
+        socket.emit(next ? 'videoOn' : 'videoOff', { to: strangerUserId })
     }
-
-    // Cleanup timer on unmount
-    useEffect(() => () => clearConsentTimer(), [])
-
-    const btnLabel = (() => {
-        if (videoEnabled)      return '📷 Camera On'
-        if (consentPending)    return '⏳ Waiting… (tap to cancel)'
-        if (partnerWantsVideo) return '✅ They want video — click to go live!'
-        return '📷 Enable Video'
-    })()
 
     return (
         <div id="localVideoWrap">
@@ -136,18 +76,20 @@ export default function LocalVideo({
                 onClick={() => setChangeCamOverly(true)}
                 autoPlay playsInline controls={false} muted
             />
+
+            {/* Partner video indicator — subtle badge when they're on camera */}
+            {partnerVideoOn && !videoEnabled && (
+                <div id="partner-video-badge">📷 Partner is on video</div>
+            )}
+
             <button
                 id="videoConsentBtn"
-                className={[
-                    videoEnabled                        ? 'video-on'      : 'video-off',
-                    consentPending                      ? 'consent-pending' : '',
-                    partnerWantsVideo && !videoEnabled  ? 'partner-ready' : '',
-                ].join(' ').trim()}
+                className={videoEnabled ? 'video-on' : 'video-off'}
                 onClick={handleToggleVideo}
-                title={videoEnabled ? 'Turn off camera' : 'Enable camera (both must agree)'}
                 disabled={!strangerUserId}
+                title={videoEnabled ? 'Turn off your camera' : 'Turn on your camera'}
             >
-                {btnLabel}
+                {videoEnabled ? '📷 Camera On' : '📷 Enable Video'}
             </button>
         </div>
     )

@@ -8,7 +8,7 @@ import client  from './redisClient.js'
 // Configure VAPID once on module load
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     webPush.setVapidDetails(
-        process.env.VAPID_SUBJECT || 'mailto:admin@realtalk.in',
+        process.env.VAPID_SUBJECT || 'mailto:admin@unibuddy.in',
         process.env.VAPID_PUBLIC_KEY,
         process.env.VAPID_PRIVATE_KEY,
     )
@@ -26,10 +26,10 @@ export async function sendCollegeNotifications(domain) {
     if (!subs.length) return
 
     const payload = JSON.stringify({
-        title: 'RealTalk',
+        title: 'UniBuddy',
         body:  'Someone from your college just joined — be the first to match! 🎉',
         url:   '/',
-        tag:   `realtalk-notify-${domain}`,
+        tag:   `unibuddy-notify-${domain}`,
     })
 
     let removed = 0

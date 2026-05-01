@@ -4,7 +4,7 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
     const navigate = useNavigate()
 
     function handleLogout() {
-        localStorage.removeItem('rt_token')
+        localStorage.removeItem('ub_token')
         if (setUsername) setUsername(null)
         navigate('/')
     }
@@ -13,7 +13,7 @@ export default function Navbar({ strangerUsername, connectionStatus, promptActiv
         <nav id="navbar">
             <div id="nav-logo">
                 <span id="nav-logo-spark">✦</span>
-                RealTalk
+                UniBuddy
             </div>
 
             <div id="nav-center">

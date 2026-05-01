@@ -1,0 +1,81 @@
+services:
+  - type: web
+    name: unibuddy-server
+    runtime: node
+    region: singapore      # closest to India for low latency
+    plan: free
+
+    rootDir: .             # this file lives inside /server — so rootDir is .
+    buildCommand: npm install
+    startCommand: npm start
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ── Redis (Upstash) ─────────────────────────────────────
+      # Get these from: https://console.upstash.com → Redis → your DB → Connect
+      - key: REDIS_HOST
+        sync: false         # set manually in Render dashboard
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_PWD
+        sync: false
+      - key: REDIS_TLS
+        value: "true"       # Upstash requires TLS
+
+      # ── App URLs ────────────────────────────────────────────
+      # Set PUBLIC_WEBSOCKET_URL to your Render URL after first deploy
+      # e.g. https://unibuddy-server.onrender.com
+      - key: PUBLIC_WEBSOCKET_URL
+        sync: false
+
+      # ── Auth ────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates a secure random value
+
+      # ── Email (Gmail App Password) ───────────────────────────
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+
+      # ── TURN Server ─────────────────────────────────────────
+      # Leave empty to fall back to open-relay (fine for launch)
+      - key: METERED_API_KEY
+        sync: false
+      - key: METERED_APP_NAME
+        sync: false
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+
+      # ── Payments (Razorpay) ─────────────────────────────────
+      # Get from: https://dashboard.razorpay.com/app/keys
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+
+      # ── Web Push (Notify Me) ────────────────────────────────
+      # Generate once: node -e "import('web-push').then(({default:wp})=>console.log(JSON.stringify(wp.generateVAPIDKeys())))"
+      # NEVER regenerate after users subscribe — breaks all existing subscriptions
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+
+      # ── Admin ────────────────────────────────────────────────
+      - key: ADMIN_KEY
+        sync: false
+      - key: STATS_KEY
+        sync: false

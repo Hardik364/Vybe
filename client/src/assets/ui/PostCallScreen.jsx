@@ -187,20 +187,20 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
     }
 
     // ── Guest gate — shown after the 1 free guest call ───────
-    if (localStorage.getItem('rt_guest') === '1') {
+    if (localStorage.getItem('ub_guest') === '1') {
         return (
             <div id="postCallScreen">
                 <div id="postCall-container">
                     <div id="guest-gate">
                         <span id="guest-gate-emoji">✨</span>
-                        <h2 id="guest-gate-title">You just had your first RealTalk!</h2>
+                        <h2 id="guest-gate-title">You just had your first UniBuddy!</h2>
                         <p id="guest-gate-body">
                             Sign up free to keep talking to strangers from your college — and unlock Connect so you can stay in touch.
                         </p>
                         <button
                             id="guest-signup-btn"
                             onClick={() => {
-                                localStorage.removeItem('rt_guest')
+                                localStorage.removeItem('ub_guest')
                                 window.location.href = '/'
                             }}
                         >

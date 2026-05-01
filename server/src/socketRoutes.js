@@ -19,8 +19,7 @@ function pickPrompt(excludeId = null) {
 // ── Track pending Connect requests: socketId → { partnerId, timer }
 const pendingConnects = new Map()
 
-// ── Track video consent: socketId → Set of consenting socket IDs
-const videoConsents   = new Map()
+// (video consent tracking removed — each user controls their own camera independently)
 
 // ── Per-socket rate limiter ───────────────────────────────────────────────────
 // limits: Map of event name → { windowMs, max }
@@ -110,35 +109,11 @@ export function handelSocketConnection(io, socket) {
         io.to(to).emit('hidePrompt')
     })
 
-    // ── Video Consent ─────────────────────────────────────────
-    socket.on('videoConsentOn', ({ to }) => {
-        if (!videoConsents.has(to)) videoConsents.set(to, new Set())
-        videoConsents.get(to).add(socket.id)
-        io.to(to).emit('partnerWantsVideo')
-
-        const partnerConsents = videoConsents.get(socket.id)
-        if (partnerConsents && partnerConsents.has(to)) {
-            io.to(socket.id).emit('videoBothConsented')
-            io.to(to).emit('videoBothConsented')
-            // Clean up both entries fully
-            videoConsents.get(socket.id)?.delete(to)
-            videoConsents.get(to)?.delete(socket.id)
-            if (!videoConsents.get(socket.id)?.size) videoConsents.delete(socket.id)
-            if (!videoConsents.get(to)?.size)        videoConsents.delete(to)
-        }
-    })
-
-    socket.on('videoConsentOff', ({ to }) => {
-        // Clean up: remove socket.id from to's consent Set
-        videoConsents.get(to)?.delete(socket.id)
-        if (!videoConsents.get(to)?.size) videoConsents.delete(to)
-        // Also remove to from socket.id's consent Set
-        videoConsents.get(socket.id)?.delete(to)
-        if (!videoConsents.get(socket.id)?.size) videoConsents.delete(socket.id)
-
-        io.to(to).emit('partnerTurnedOffVideo')
-        io.to(socket.id).emit('videoDisabled')
-    })
+    // ── Video — each user controls their own camera ───────────
+    // Pressing Enable Video turns YOUR camera on immediately.
+    // Partner gets notified so they can optionally do the same.
+    socket.on('videoOn',  ({ to }) => io.to(to).emit('partnerVideoOn'))
+    socket.on('videoOff', ({ to }) => io.to(to).emit('partnerVideoOff'))
 
     // ── Connect / Move On ─────────────────────────────────────
     socket.on('connectRequest', ({ to }) => {
@@ -391,15 +366,6 @@ export function handelSocketConnection(io, socket) {
             if (pendingConnects.has(socket.id)) {
                 clearTimeout(pendingConnects.get(socket.id).timer)
                 pendingConnects.delete(socket.id)
-            }
-
-            // Clean up all consent Sets this socket is referenced IN
-            for (const [, consentSet] of videoConsents) {
-                consentSet.delete(socket.id)
-            }
-            videoConsents.delete(socket.id)
-            for (const [key, set] of videoConsents) {
-                if (!set.size) videoConsents.delete(key)
             }
 
             cleanupPartnership(socket.id)

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import ABCVerificationModal from "../assets/ui/ABCVerificationModal"
 
 const API = import.meta.env.VITE_APP_WEBSOCKET_URL   // http://localhost:3000
 
@@ -75,7 +74,7 @@ function StepEmail({ onOtpSent }) {
 
             <p id="signup-disclaimer">
                 {import.meta.env.VITE_APP_ENV === 'production'
-                    ? 'College email required — keeps RealTalk student-only'
+                    ? 'College email required — keeps UniBuddy student-only'
                     : '🛠 Dev mode: any email works for testing'}
             </p>
         </form>
@@ -213,14 +212,13 @@ function StepOtp({ email, username, onVerified, onBack }) {
 // ── Main SignUp component ─────────────────────────────────────
 export default function SingUp({ setUsername }) {
     const navigate = useNavigate()
-    const [step,        setStep]        = useState('email')   // 'email' | 'otp' | 'abc'
+    const [step,         setStep]        = useState('email')   // 'email' | 'otp'
     const [pendingEmail, setPendingEmail] = useState('')
     const [pendingName,  setPendingName]  = useState('')
-    const [pendingToken, setPendingToken] = useState(null)
 
     // Auto-login if valid JWT already stored
     useEffect(() => {
-        const token = localStorage.getItem('rt_token')
+        const token = localStorage.getItem('ub_token')
         if (!token) return
         fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.json())
@@ -229,7 +227,7 @@ export default function SingUp({ setUsername }) {
                     setUsername(data.username)
                     navigate('/chat')
                 } else {
-                    localStorage.removeItem('rt_token')
+                    localStorage.removeItem('ub_token')
                 }
             })
             .catch(() => {})
@@ -242,16 +240,9 @@ export default function SingUp({ setUsername }) {
     }
 
     function handleVerified(token, username) {
-        localStorage.removeItem('rt_guest')  // clear guest flag if they sign up
-        setPendingToken(token)
-        // Show ABC ID step — user can skip it; token stored after they proceed
-        setStep('abc')
-    }
-
-    function proceedToChat(token) {
-        const t = token || pendingToken
-        localStorage.setItem('rt_token', t)
-        setUsername(pendingName)
+        localStorage.removeItem('ub_guest')
+        localStorage.setItem('ub_token', token)
+        setUsername(username)
         navigate('/chat')
     }
 
@@ -261,22 +252,10 @@ export default function SingUp({ setUsername }) {
         const nouns = ['Panda', 'Llama', 'Falcon', 'Otter', 'Gecko', 'Koala', 'Lynx', 'Moose']
         const rand  = n => Math.floor(Math.random() * n)
         const name  = `${adjs[rand(adjs.length)]}${nouns[rand(nouns.length)]}${rand(90) + 10}`
-        localStorage.setItem('rt_guest', '1')
+        localStorage.setItem('ub_guest', '1')
         setUsername(name)
         navigate('/chat')
     }
-
-    // ABC step renders as a full-screen overlay on top of signup page
-    if (step === 'abc') return (
-        <div id="signupPage">
-            <div id="signup-glow"></div>
-            <ABCVerificationModal
-                token={pendingToken}
-                onVerified={() => proceedToChat()}
-                onSkip={() => proceedToChat()}
-            />
-        </div>
-    )
 
     return (
         <div id="signupPage">
@@ -285,7 +264,7 @@ export default function SingUp({ setUsername }) {
             <div id="signup-card">
                 <div id="signup-logo">
                     <span id="signup-logo-spark">✦</span>
-                    RealTalk
+                    UniBuddy
                 </div>
 
                 <p id="signup-tagline">

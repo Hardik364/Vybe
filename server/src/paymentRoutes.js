@@ -1,4 +1,4 @@
-// paymentRoutes.js — Razorpay integration for RealTalk
+// paymentRoutes.js — Razorpay integration for UniBuddy
 // Endpoints:
 //   POST /payments/create-order   — create a Razorpay order
 //   POST /payments/verify         — verify payment signature, activate tier

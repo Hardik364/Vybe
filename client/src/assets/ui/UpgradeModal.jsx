@@ -22,11 +22,11 @@ const TIERS = [
         name:      'Plus',
         price:     '₹49',
         period:    '/month',
-        scope:     '🏙️ Same city colleges',
+        scope:     '🗺️ Same state colleges',
         color:     '#6C63FF',
         features:  [
             'Everything in Free',
-            'Match across your city',
+            'Match across your state',
             'Priority matching queue',
         ],
         plans: [

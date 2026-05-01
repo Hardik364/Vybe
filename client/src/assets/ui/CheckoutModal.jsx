@@ -1,4 +1,4 @@
-// CheckoutModal — Razorpay checkout for RealTalk plans
+// CheckoutModal — Razorpay checkout for UniBuddy plans
 // Props:
 //   selectedPlan  — 'day-pass' | 'week-pass' | 'plus-monthly' | 'pro-monthly'
 //   onSuccess(tier) — called after payment verified
@@ -38,7 +38,7 @@ export default function CheckoutModal({ selectedPlan, onSuccess, onClose }) {
 
     async function handlePay() {
         setStep('paying')
-        const token = localStorage.getItem('rt_token')
+        const token = localStorage.getItem('ub_token')
         if (!token) { setErrMsg('Please log in to purchase'); setStep('error'); return }
 
         // 1 — create Razorpay order on server
@@ -71,7 +71,7 @@ export default function CheckoutModal({ selectedPlan, onSuccess, onClose }) {
             key:         orderData.keyId,
             amount:      orderData.amount,
             currency:    orderData.currency,
-            name:        'RealTalk',
+            name:        'UniBuddy',
             description: `${plan.label} — ${plan.duration}`,
             order_id:    orderData.orderId,
             theme:       { color: plan.color },
@@ -128,7 +128,7 @@ export default function CheckoutModal({ selectedPlan, onSuccess, onClose }) {
                 <p className="checkout-status-body">
                     Your <strong>{plan.label}</strong> is active for {plan.duration}.
                     Reload to start matching across{' '}
-                    {newTier === 'pro' ? 'all colleges worldwide' : 'same-city colleges'}.
+                    {newTier === 'pro' ? 'all colleges worldwide' : 'same-state colleges'}.
                 </p>
                 <button className="checkout-primary-btn" onClick={() => window.location.reload()}>
                     Start Exploring →
@@ -154,7 +154,7 @@ export default function CheckoutModal({ selectedPlan, onSuccess, onClose }) {
 
                 <ul className="checkout-perks">
                     {plan.tier === 'plus' && <>
-                        <li>✓ Match across same-city colleges</li>
+                        <li>✓ Match across same-state colleges</li>
                         <li>✓ Priority in matching queue</li>
                         <li>✓ All Free features included</li>
                     </>}

@@ -1,0 +1,160 @@
+{
+  "_note": "Maps email domain → state for tier-based matching. Plus tier = same state. Pro = all India + global. Unknown .ac.in domains get 'india' pool.",
+
+  "maharashtra": [
+    "iitb.ac.in","vjti.ac.in","ict.ac.in","mu.ac.in","tiss.edu",
+    "somaiya.edu","nmims.edu","spjimr.org","iimnagpur.ac.in","iimmumbai.ac.in",
+    "symbiosis.ac.in","pu.ac.in","sppu.ac.in","coep.ac.in","mitpune.edu",
+    "dypatil.edu","mitwpu.edu.in","dypunipune.edu.in","vnit.ac.in","iiserm.ac.in"
+  ],
+
+  "delhi-ncr": [
+    "iitd.ac.in","du.ac.in","jnu.ac.in","jamia.ac.in","dtu.ac.in",
+    "nsut.ac.in","iift.ac.in","iimc.ac.in","fms.edu","dse.edu.in",
+    "ip.edu.in","igdtuw.ac.in","iiitd.ac.in","amity.edu",
+    "galgotias.edu","jiit.ac.in","sharda.ac.in","nitdelhi.ac.in"
+  ],
+
+  "karnataka": [
+    "iisc.ac.in","iimb.ac.in","pes.edu","christuniversity.in",
+    "rvu.edu.in","msrit.edu","bmsce.ac.in","manipal.edu","mahe.edu",
+    "vtu.ac.in","rvce.edu.in","bmsit.in","sit.ac.in","nie.ac.in",
+    "sjce.ac.in","kle.edu.in","dayananda.edu","iiitb.ac.in",
+    "iitdh.ac.in","nitk.ac.in"
+  ],
+
+  "telangana": [
+    "iith.ac.in","uohyd.ac.in","hcu.ac.in","hyderabad.bits-pilani.ac.in",
+    "iiit.ac.in","cvr.ac.in","osmania.ac.in","mgit.ac.in","iiith.ac.in"
+  ],
+
+  "andhra-pradesh": [
+    "vitap.ac.in","kluniversity.in","vignan.ac.in","andhrauniv.edu.in",
+    "rgukt.ac.in","iimv.ac.in","nitandhra.ac.in","iittp.ac.in"
+  ],
+
+  "tamil-nadu": [
+    "iitm.ac.in","nitt.edu","sastra.edu","srmist.edu.in","vit.ac.in",
+    "annauniv.edu","ssn.edu.in","psg.edu","amrita.edu","cit.edu.in",
+    "sathyabama.ac.in","kct.ac.in","bsauniv.ac.in","saveetha.ac.in",
+    "veltech.edu.in","hindustan.ac.in","iimtrichy.ac.in","auchennai.ac.in",
+    "nitt.edu"
+  ],
+
+  "west-bengal": [
+    "iitkgp.ac.in","jadavpur.edu","presiuniv.ac.in","caluniv.ac.in",
+    "wbut.ac.in","burdwanuniv.ac.in","vidyasagar.ac.in","rkmveri.ac.in",
+    "iimcal.ac.in","nitdgp.ac.in"
+  ],
+
+  "gujarat": [
+    "iima.ac.in","nirmauni.ac.in","gtu.ac.in","svnit.ac.in",
+    "pdpu.ac.in","ddu.ac.in","cept.ac.in","iitgn.ac.in"
+  ],
+
+  "uttar-pradesh": [
+    "iitk.ac.in","mnnit.ac.in","hbtu.ac.in","iiml.ac.in",
+    "bhu.ac.in","lkouniv.ac.in","aktu.ac.in","bbau.ac.in",
+    "amity.edu","iiita.ac.in","iiitl.ac.in"
+  ],
+
+  "uttarakhand": [
+    "iitr.ac.in","dit.ac.in","gbpuat.ac.in","srhu.edu.in",
+    "doonuniversity.ac.in","upes.ac.in","graphic-era.edu",
+    "iimkashipur.ac.in","nituk.ac.in"
+  ],
+
+  "rajasthan": [
+    "iitj.ac.in","mnit.ac.in","lnmiit.ac.in","bits-pilani.ac.in",
+    "pilani.bits-pilani.ac.in","uniraj.ac.in","jecrc.ac.in",
+    "poornima.org","iimidr.ac.in","iimu.ac.in"
+  ],
+
+  "madhya-pradesh": [
+    "manit.ac.in","vitbhopal.ac.in","iiserb.ac.in","rgpv.ac.in",
+    "davv.ac.in","medicaps.ac.in","iiti.ac.in","iifm.ac.in","nitie.ac.in"
+  ],
+
+  "goa": [
+    "goa.bits-pilani.ac.in","bits-goa.ac.in","unigoa.ac.in","iitgoa.ac.in","nitgoa.ac.in"
+  ],
+
+  "kerala": [
+    "cusat.ac.in","keralauniversity.ac.in","iimk.ac.in","nitc.ac.in",
+    "tkmce.ac.in","cet.ac.in","mec.ac.in","sngce.ac.in","gec.ac.in",
+    "iitpkd.ac.in","iiitkottayam.ac.in"
+  ],
+
+  "assam": [
+    "iitg.ac.in","gauhati.ac.in","dibru.ac.in","tezpur.ac.in",
+    "nits.ac.in","cit.ac.in","nehu.ac.in"
+  ],
+
+  "himachal-pradesh": [
+    "iitmandi.ac.in","hpuniv.ac.in","nith.ac.in","juit.ac.in","iimsirmaur.ac.in"
+  ],
+
+  "jammu-kashmir": [
+    "iitjammu.ac.in","iimj.ac.in","nitsri.ac.in","jklu.edu.in","nitagartala.ac.in"
+  ],
+
+  "punjab": [
+    "thapar.edu","lpu.in","gndu.ac.in","ptu.ac.in",
+    "nitj.ac.in","iimamritsar.ac.in","iitrpr.ac.in"
+  ],
+
+  "haryana": [
+    "nitkkr.ac.in","dcrustm.ac.in","mdurohtak.ac.in","gjust.ac.in",
+    "iimrohtak.ac.in","gju.ac.in"
+  ],
+
+  "jharkhand": [
+    "iitism.ac.in","xlri.ac.in","iimranchi.ac.in","bitsindri.ac.in","nitism.ac.in"
+  ],
+
+  "odisha": [
+    "iitbbs.ac.in","nitrkl.ac.in","iimsambalpur.ac.in","utkal.ac.in"
+  ],
+
+  "bihar": [
+    "iitp.ac.in","iimbodhgaya.ac.in","nitp.ac.in","bub.ac.in","magadhuniversity.ac.in"
+  ],
+
+  "chhattisgarh": [
+    "iitbhilai.ac.in","nitrr.ac.in","csvtu.ac.in","rungta.ac.in","iimraipur.ac.in"
+  ],
+
+  "meghalaya": [
+    "iimshillong.ac.in","nitm.ac.in","nehu.ac.in"
+  ],
+
+  "manipur": [
+    "nitmanipur.ac.in","manipuruniv.ac.in"
+  ],
+
+  "mizoram": [
+    "nitmz.ac.in","mzu.ac.in"
+  ],
+
+  "nagaland": [
+    "nitnagaland.ac.in"
+  ],
+
+  "tripura": [
+    "nita.ac.in","tripurauniv.ac.in"
+  ],
+
+  "sikkim": [
+    "nitsikkim.ac.in"
+  ],
+
+  "arunachal-pradesh": [
+    "nitap.ac.in"
+  ],
+
+  "puducherry": [
+    "pondiuni.edu.in","pondicherryuniversity.ac.in"
+  ],
+
+  "global": []
+}

@@ -30,8 +30,8 @@ const PLAN_LABELS = {
 
 const TIER_INFO = {
     free: { label: 'Free',  color: '#A0A0A0', scope: 'Your college only'   },
-    plus: { label: 'Plus',  color: '#6C63FF', scope: 'Same city colleges'  },
-    pro:  { label: 'Pro',   color: '#F59E0B', scope: 'Any college globally' },
+    plus: { label: 'Plus',  color: '#6C63FF', scope: 'Same state colleges'  },
+    pro:  { label: 'Pro',   color: '#F59E0B', scope: 'Any college in India & globally' },
 }
 
 export default function AccountPage() {
@@ -41,7 +41,7 @@ export default function AccountPage() {
     const [showUpgrade, setShowUpgrade] = useState(false)
     const [username,    setUsername]    = useState(null)
 
-    const token = localStorage.getItem('rt_token')
+    const token = localStorage.getItem('ub_token')
 
     useEffect(() => {
         if (!token) { navigate('/'); return }
@@ -80,7 +80,7 @@ export default function AccountPage() {
             {/* Back bar */}
             <nav className="account-nav">
                 <button className="account-back-btn" onClick={() => navigate('/chat')}>
-                    ← Back to RealTalk
+                    ← Back to UniBuddy
                 </button>
                 <span className="account-nav-title">Account</span>
             </nav>
@@ -163,7 +163,7 @@ export default function AccountPage() {
                     <button
                         className="account-logout-btn"
                         onClick={() => {
-                            localStorage.removeItem('rt_token')
+                            localStorage.removeItem('ub_token')
                             navigate('/')
                         }}
                     >

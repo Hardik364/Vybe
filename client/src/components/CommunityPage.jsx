@@ -89,7 +89,7 @@ function CreateChannelModal({ username, onCreated, onClose }) {
 // ── Main Community Page ───────────────────────────────────────
 export default function CommunityPage({ username: propUsername }) {
     const navigate  = useNavigate()
-    const [username, setUsername] = useState(propUsername || localStorage.getItem('rt_username') || null)
+    const [username, setUsername] = useState(propUsername || localStorage.getItem('ub_username') || null)
 
     const [channels,    setChannels]    = useState([])
     const [activeId,    setActiveId]    = useState(null)
@@ -126,7 +126,7 @@ export default function CommunityPage({ username: propUsername }) {
         e.preventDefault()
         const name = guestName.trim()
         if (!name) return
-        localStorage.setItem('rt_username', name)
+        localStorage.setItem('ub_username', name)
         setUsername(name)
         setShowGuest(false)
     }
@@ -134,7 +134,7 @@ export default function CommunityPage({ username: propUsername }) {
     // ── Socket connection ────────────────────────────────────
     useEffect(() => {
         if (!username) return
-        const token = localStorage.getItem('rt_token')
+        const token = localStorage.getItem('ub_token')
         const sock  = io(API, {
             transports: ['websocket'],
             auth: { username, token: token || undefined }
@@ -306,7 +306,7 @@ export default function CommunityPage({ username: propUsername }) {
     if (showGuest) return (
         <div className="cm-guest-screen">
             <div className="cm-guest-card">
-                <div className="cm-logo"><span>✦</span> RealTalk</div>
+                <div className="cm-logo"><span>✦</span> UniBuddy</div>
                 <h2>Join the Community</h2>
                 <p>Pick a name to start chatting in channels</p>
                 <form onSubmit={handleGuestJoin}>
@@ -332,7 +332,7 @@ export default function CommunityPage({ username: propUsername }) {
             <aside className="cm-sidebar">
                 <div className="cm-sidebar-header">
                     <button className="cm-logo-btn" onClick={() => navigate('/')}>
-                        <span>✦</span> RealTalk
+                        <span>✦</span> UniBuddy
                     </button>
                     <span className="cm-sidebar-label">Community</span>
                 </div>

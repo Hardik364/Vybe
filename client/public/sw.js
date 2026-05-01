@@ -1,4 +1,4 @@
-// RealTalk Service Worker — handles Web Push notifications (Notify Me feature)
+// UniBuddy Service Worker — handles Web Push notifications (Notify Me feature)
 // Registered by App.jsx on mount.  Must live at /sw.js (served from public/).
 
 self.addEventListener('install', () => self.skipWaiting())
@@ -7,14 +7,14 @@ self.addEventListener('activate', e => e.waitUntil(clients.claim()))
 // ── Push received ────────────────────────────────────────────
 self.addEventListener('push', event => {
     let data = {}
-    try { data = event.data?.json() ?? {} } catch { data = { title: 'RealTalk', body: event.data?.text() || '' } }
+    try { data = event.data?.json() ?? {} } catch { data = { title: 'UniBuddy', body: event.data?.text() || '' } }
 
-    const title   = data.title || 'RealTalk'
+    const title   = data.title || 'UniBuddy'
     const options = {
         body:    data.body    || 'Someone from your college is online — jump in!',
         icon:    data.icon    || '/favicon.ico',
         badge:   data.badge   || '/favicon.ico',
-        tag:     data.tag     || 'realtalk-notify',
+        tag:     data.tag     || 'unibuddy-notify',
         data:    { url: data.url || '/' },
         renotify: true,
         requireInteraction: false,

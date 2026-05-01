@@ -86,7 +86,7 @@ export default function ChatPage({ username, setUsername }) {
 
     // ── Phase 6: load tier ───────────────────────────────────
     useEffect(() => {
-        const token = localStorage.getItem('rt_token')
+        const token = localStorage.getItem('ub_token')
         if (!token) return
         fetch(`${import.meta.env.VITE_APP_WEBSOCKET_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }

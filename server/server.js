@@ -110,6 +110,9 @@ app.use('/community', communityRoutes)
 app.use('/api', apiRoutes)
 app.use('/payments', paymentRoutes)
 
+// ── Health check (Render pings this to check if service is up) ──
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }))
+
 // Stats — protect with a simple token in production
 app.get('/stats', async (req, res) => {
   if (process.env.NODE_ENV === 'production') {

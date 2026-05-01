@@ -16,7 +16,7 @@ export default function useSocket(
 
     useEffect(() => {
         if (username) {
-            const token = localStorage.getItem('rt_token')
+            const token = localStorage.getItem('ub_token')
             const newSocket = io(import.meta.env.VITE_APP_WEBSOCKET_URL, {
                 transports: ['websocket'],
                 auth: { username, token: token || undefined }
@@ -52,7 +52,7 @@ export default function useSocket(
             socket.on('strangerLeftTheChat', clearState)
             socket.on('errMakingPair', () => socket.emit('startConnection'))
             socket.on('accountSuspended', (msg) => {
-                localStorage.removeItem('rt_token')
+                localStorage.removeItem('ub_token')
                 alert(`⛔ ${msg}`)
                 window.location.href = '/'
             })

@@ -1,12 +1,17 @@
 import nodemailer from 'nodemailer'
 
 // Create transporter from env vars
+// Using explicit host/port instead of service:'gmail' so we can force IPv4.
+// Render free tier has no IPv6 — smtp.gmail.com resolves to IPv6 by default.
 function createTransporter() {
     return nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,           // SSL on port 465
+        family: 4,              // force IPv4 — fixes ENETUNREACH on Render free tier
         auth: {
             user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,   // Gmail App Password (not your real password)
+            pass: process.env.EMAIL_PASS,
         }
     })
 }

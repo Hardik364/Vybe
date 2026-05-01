@@ -15,6 +15,10 @@ import 'dotenv/config'
 
 const app = express();
 
+// Trust Render's proxy so express-rate-limit reads the real client IP
+// from X-Forwarded-For instead of throwing a validation error
+app.set('trust proxy', 1)
+
 // ── Security headers ─────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,   // needed for WebRTC

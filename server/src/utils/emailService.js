@@ -1,27 +1,20 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-// Create transporter from env vars
-// Using explicit host/port instead of service:'gmail' so we can force IPv4.
-// Render free tier has no IPv6 — smtp.gmail.com resolves to IPv6 by default.
-function createTransporter() {
-    return nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,           // SSL on port 465
-        family: 4,              // force IPv4 — fixes ENETUNREACH on Render free tier
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-        }
-    })
-}
+// Resend HTTP API — works on Render free tier (no SMTP port blocking)
+// Get your API key at: https://resend.com → API Keys → Create
+// Add RESEND_API_KEY to your Render environment variables
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+// The "from" address must be either:
+//   - A domain you've verified in Resend dashboard (recommended for production)
+//   - "onboarding@resend.dev" (Resend sandbox — works immediately, no setup)
+// To verify your domain: resend.com → Domains → Add Domain
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'UniBuddy <onboarding@resend.dev>'
 
 export async function sendOtpEmail(toEmail, otp, username) {
-    const transporter = createTransporter()
-
-    const mailOptions = {
-        from: `"UniBuddy" <${process.env.EMAIL_USER}>`,
-        to: toEmail,
+    const { data, error } = await resend.emails.send({
+        from:    FROM_EMAIL,
+        to:      toEmail,
         subject: `${otp} is your UniBuddy verification code`,
         html: `
         <div style="font-family: Inter, Arial, sans-serif; background: #0D0D0D; color: #fff; padding: 40px; border-radius: 16px; max-width: 480px; margin: 0 auto;">
@@ -41,8 +34,12 @@ export async function sendOtpEmail(toEmail, otp, username) {
             <p style="color: #555; font-size: 13px;">If you didn't request this, ignore this email.</p>
         </div>
         `
+    })
+
+    if (error) {
+        console.error('[Email] Resend error:', error)
+        throw new Error(error.message)
     }
 
-    await transporter.sendMail(mailOptions)
-    console.log(`[Email] OTP sent to ${toEmail}`)
+    console.log(`[Email] OTP sent to ${toEmail} — id: ${data?.id}`)
 }

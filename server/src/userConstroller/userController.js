@@ -72,6 +72,15 @@ export async function processUserPairing(io, socket) {
             // Pick one prompt — both users see the same one on match
             const matchPrompt = pickPrompt()
 
+            // ── Count this call against any guest sockets ─────
+            for (const key of userPair) {
+                const s = io.sockets.sockets.get(key.socketId)
+                if (s?.isGuest && s.deviceId) {
+                    const k = `guest_calls:device:${s.deviceId}`
+                    client.incr(k).then(() => client.expire(k, 24 * 60 * 60)).catch(() => {})
+                }
+            }
+
             userPair.forEach(key => {
                 const s = io.sockets.sockets.get(key.socketId)
                 if (s) s.leave(room)

@@ -216,6 +216,12 @@ export default function SingUp({ setUsername }) {
     const [pendingEmail, setPendingEmail] = useState('')
     const [pendingName,  setPendingName]  = useState('')
 
+    // Check if they were bounced back due to guest limit
+    const guestLimitHit = localStorage.getItem('ub_guest_limit') === '1'
+    useEffect(() => {
+        if (guestLimitHit) localStorage.removeItem('ub_guest_limit')
+    }, [])
+
     // Auto-login if valid JWT already stored
     useEffect(() => {
         const token = localStorage.getItem('ub_token')
@@ -247,12 +253,28 @@ export default function SingUp({ setUsername }) {
     }
 
     // ── Guest mode ────────────────────────────────────────────
+    function getOrCreateDeviceId() {
+        // Use localStorage as primary store. Not perfect but works for most cases.
+        // Server-side deviceId check catches repeat guests even if they clear localStorage
+        // only if they forget to clear it — it's a friction layer, not a hard wall.
+        let id = localStorage.getItem('ub_device_id')
+        if (!id) {
+            // Generate a random 128-bit hex ID
+            const arr = new Uint8Array(16)
+            crypto.getRandomValues(arr)
+            id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+            localStorage.setItem('ub_device_id', id)
+        }
+        return id
+    }
+
     function handleGuest() {
         const adjs  = ['Cool', 'Curious', 'Chill', 'Bold', 'Witty', 'Bright', 'Swift', 'Calm']
         const nouns = ['Panda', 'Llama', 'Falcon', 'Otter', 'Gecko', 'Koala', 'Lynx', 'Moose']
         const rand  = n => Math.floor(Math.random() * n)
         const name  = `${adjs[rand(adjs.length)]}${nouns[rand(nouns.length)]}${rand(90) + 10}`
         localStorage.setItem('ub_guest', '1')
+        localStorage.setItem('ub_guest_device', getOrCreateDeviceId())
         setUsername(name)
         navigate('/chat')
     }
@@ -270,6 +292,12 @@ export default function SingUp({ setUsername }) {
                 <p id="signup-tagline">
                     One stranger. Real talk. Your college.
                 </p>
+
+                {guestLimitHit && (
+                    <div id="guest-limit-banner">
+                        🎉 You had a great call! Sign up free to keep going.
+                    </div>
+                )}
 
                 {step === 'email' && (
                     <StepEmail onOtpSent={handleOtpSent} />

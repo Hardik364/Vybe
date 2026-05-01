@@ -86,6 +86,17 @@ io.use((socket, next) => {
 
   if (!username) return next(new Error("invalid username"))
   socket.username = username
+
+  // ── Guest tracking ───────────────────────────────────────────
+  // isGuest flag lets socketRoutes enforce the 1-call limit server-side
+  const isGuest = socket.handshake.auth.isGuest
+  if (isGuest) {
+    socket.isGuest  = true
+    socket.deviceId = socket.handshake.auth.deviceId || null
+    socket.guestIp  = socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim()
+                      || socket.handshake.address
+  }
+
   next()
 })
 

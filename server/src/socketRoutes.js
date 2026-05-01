@@ -56,13 +56,51 @@ function cleanupRateLimit(socketId) {
     rateLimitState.delete(socketId)
 }
 
+// ── Guest call tracking helpers ──────────────────────────────
+// Keys: "guest_calls:{deviceId}" and "guest_calls:ip:{ip}"
+// TTL: 24 hours — resets daily so guests get 1 call per day
+const GUEST_CALL_TTL = 24 * 60 * 60   // 24 hours in seconds
+const GUEST_CALL_MAX = 1               // calls allowed per guest per day
+
+async function hasGuestExceededLimit(socket) {
+    if (!socket.isGuest) return false
+    const checks = []
+    if (socket.deviceId) checks.push(`guest_calls:device:${socket.deviceId}`)
+    if (socket.guestIp)  checks.push(`guest_calls:ip:${socket.guestIp}`)
+    if (!checks.length)  return false
+
+    const counts = await Promise.all(checks.map(k => client.get(k)))
+    return counts.some(c => parseInt(c || '0') >= GUEST_CALL_MAX)
+}
+
+async function incrementGuestCalls(socket) {
+    if (!socket.isGuest) return
+    const pipe = client.multi()
+    if (socket.deviceId) {
+        const k = `guest_calls:device:${socket.deviceId}`
+        pipe.incr(k)
+        pipe.expire(k, GUEST_CALL_TTL)
+    }
+    // IP tracking is secondary — don't block on campus wifi (shared IP)
+    // Just track it for analytics, not enforcement
+    await pipe.exec()
+}
+
 export function handelSocketConnection(io, socket) {
 
     // Register user in live registry
     registerUser(socket)
 
     // ── Pairing ──────────────────────────────────────────────
-    socket.on("startConnection", () => {
+    socket.on("startConnection", async () => {
+        // Block guests who have already used their free call today
+        if (socket.isGuest) {
+            const exceeded = await hasGuestExceededLimit(socket)
+            if (exceeded) {
+                socket.emit('guestLimitReached')
+                return
+            }
+        }
         updateStatus(socket.id, 'waiting')
         processUserPairing(io, socket)
     })

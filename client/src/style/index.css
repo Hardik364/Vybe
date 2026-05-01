@@ -2395,6 +2395,18 @@ input  { font-family: inherit; }
 }
 
 
+/* -- Guest limit banner ----------------------------------- */
+#guest-limit-banner {
+    background: linear-gradient(135deg, #6C63FF22, #A855F722);
+    border: 1px solid #6C63FF55;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #C4BFFF;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
 /* -- Guest CTA (SingUp.jsx) ------------------------------- */
 #signup-guest-cta {
     margin-top: 6px;

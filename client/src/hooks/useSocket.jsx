@@ -16,12 +16,27 @@ export default function useSocket(
 
     useEffect(() => {
         if (username) {
-            const token = localStorage.getItem('ub_token')
+            const token    = localStorage.getItem('ub_token')
+            const isGuest  = localStorage.getItem('ub_guest') === '1'
+            const deviceId = localStorage.getItem('ub_device_id') || undefined
+
             const newSocket = io(import.meta.env.VITE_APP_WEBSOCKET_URL, {
                 transports: ['websocket'],
-                auth: { username, token: token || undefined }
+                auth: {
+                    username,
+                    token:    token    || undefined,
+                    isGuest:  isGuest  || undefined,
+                    deviceId: isGuest ? deviceId : undefined,
+                }
             });
             setSocket(newSocket);
+
+            // ── Guest limit reached — server rejected the search ──
+            newSocket.on('guestLimitReached', () => {
+                // Redirect to signup with a "you've used your free call" message
+                localStorage.setItem('ub_guest_limit', '1')
+                nav('/')
+            })
 
             return () => {
                 newSocket.disconnect()

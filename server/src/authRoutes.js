@@ -36,12 +36,13 @@ function isCollegeEmail(email) {
 }
 
 // ── POST /auth/send-otp ───────────────────────────────────────
-// Body: { email, username }
+// Body: { email, username? }
+// For returning users, username is optional — we look it up from Redis.
 router.post('/send-otp', async (req, res) => {
     try {
         const { email, username } = req.body
-        if (!email || !username) {
-            return res.status(400).json({ error: 'Email and username are required' })
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' })
         }
 
         const emailLower = email.toLowerCase().trim()
@@ -56,6 +57,16 @@ router.post('/send-otp', async (req, res) => {
             })
         }
 
+        // Check if this is a returning user (username already pinned to email)
+        const savedUsername = await client.get(`user:username:${emailLower}`)
+        const isReturning   = !!savedUsername
+        const resolvedName  = savedUsername || username
+
+        // New users must supply a username
+        if (!isReturning && !username?.trim()) {
+            return res.status(400).json({ error: 'Username is required for new accounts' })
+        }
+
         // Rate limit: max 3 OTPs per email per 10 minutes
         const attempts = await client.get(`otp-attempts:${emailLower}`)
         if (attempts && parseInt(attempts) >= 3) {
@@ -64,17 +75,22 @@ router.post('/send-otp', async (req, res) => {
 
         const otp = generateOtp()
 
-        // Store OTP in Redis with 10min TTL
-        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({ otp, username }))
+        // Store OTP with resolved username
+        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({ otp, username: resolvedName }))
 
         // Increment attempt counter (expires in 10min)
         await client.incr(`otp-attempts:${emailLower}`)
         await client.expire(`otp-attempts:${emailLower}`, 600)
 
         // Send email
-        await sendOtpEmail(emailLower, otp, username)
+        await sendOtpEmail(emailLower, otp, resolvedName)
 
-        res.json({ success: true, message: 'OTP sent to your email' })
+        res.json({
+            success:     true,
+            message:     'OTP sent to your email',
+            isReturning,
+            username:    isReturning ? savedUsername : undefined,
+        })
 
     } catch (err) {
         console.error('[send-otp]', err)

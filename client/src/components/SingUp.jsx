@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 
-const API = import.meta.env.VITE_APP_WEBSOCKET_URL   // http://localhost:3000
+const API = import.meta.env.VITE_APP_WEBSOCKET_URL
 
-// ── Step 1: email + username form ────────────────────────────
-function StepEmail({ onOtpSent }) {
+// ── Step 1a: NEW USER — name + email ─────────────────────────
+function StepNewUser({ onOtpSent }) {
     const [username, setUsername] = useState('')
     const [email,    setEmail]    = useState('')
     const [error,    setError]    = useState('')
@@ -15,19 +15,19 @@ function StepEmail({ onOtpSent }) {
         setError('')
         const u = username.trim()
         const m = email.trim().toLowerCase()
-        if (!u)  return setError('Enter your name')
-        if (!m)  return setError('Enter your college email')
+        if (!u) return setError('Enter your name')
+        if (!m) return setError('Enter your college email')
 
         setLoading(true)
         try {
             const res  = await fetch(`${API}/auth/send-otp`, {
-                method: 'POST',
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: m, username: u })
+                body:    JSON.stringify({ email: m, username: u }),
             })
             const data = await res.json()
             if (!res.ok) return setError(data.error || 'Something went wrong')
-            onOtpSent(m, u)
+            onOtpSent(m, u, false)
         } catch {
             setError('Cannot reach server. Is it running?')
         } finally {
@@ -81,16 +81,95 @@ function StepEmail({ onOtpSent }) {
     )
 }
 
+// ── Step 1b: RETURNING USER — email only ──────────────────────
+function StepReturningUser({ onOtpSent, onSwitchToNew }) {
+    const [email,   setEmail]   = useState('')
+    const [error,   setError]   = useState('')
+    const [loading, setLoading] = useState(false)
+
+    async function handleSubmit(e) {
+        e.preventDefault()
+        setError('')
+        const m = email.trim().toLowerCase()
+        if (!m) return setError('Enter your college email')
+
+        setLoading(true)
+        try {
+            const res  = await fetch(`${API}/auth/send-otp`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ email: m }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                // If the server says this email has no account, switch to new-user flow
+                if (res.status === 400 && data.error?.includes('Username is required')) {
+                    setError('No account found for this email. Sign up instead.')
+                } else {
+                    setError(data.error || 'Something went wrong')
+                }
+                return
+            }
+
+            if (!data.isReturning) {
+                // Email exists but no username saved — treat as new user
+                setError('No account found. Please sign up with your name first.')
+                return
+            }
+
+            onOtpSent(m, data.username, true)
+        } catch {
+            setError('Cannot reach server. Is it running?')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} id="signup-form">
+            <div id="signup-input-wrapper">
+                <span id="signup-input-icon">🎓</span>
+                <input
+                    type="email"
+                    className="singupInputBox"
+                    placeholder="Your college email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoFocus
+                />
+            </div>
+
+            {error && <p className="signup-error">{error}</p>}
+
+            <button
+                type="submit"
+                className="singupInputBox"
+                id="signupSubmitBtn"
+                disabled={loading}
+            >
+                {loading ? 'Sending OTP...' : 'Send Login Code →'}
+            </button>
+
+            <button
+                type="button"
+                id="switch-mode-btn"
+                onClick={onSwitchToNew}
+            >
+                Not registered? Sign up here →
+            </button>
+        </form>
+    )
+}
+
 // ── Step 2: OTP input ─────────────────────────────────────────
-function StepOtp({ email, username, onVerified, onBack }) {
-    const [otp,      setOtp]      = useState(['', '', '', '', '', ''])
-    const [error,    setError]    = useState('')
-    const [loading,  setLoading]  = useState(false)
+function StepOtp({ email, username, isReturning, onVerified, onBack }) {
+    const [otp,       setOtp]      = useState(['', '', '', '', '', ''])
+    const [error,     setError]    = useState('')
+    const [loading,   setLoading]  = useState(false)
     const [resending, setResending] = useState(false)
-    const [resendCd, setResendCd] = useState(30)
+    const [resendCd,  setResendCd] = useState(30)
     const inputs = useRef([])
 
-    // Countdown for resend
     useEffect(() => {
         if (resendCd <= 0) return
         const t = setTimeout(() => setResendCd(c => c - 1), 1000)
@@ -106,9 +185,7 @@ function StepOtp({ email, username, onVerified, onBack }) {
     }
 
     function handleKeyDown(i, e) {
-        if (e.key === 'Backspace' && !otp[i] && i > 0) {
-            inputs.current[i - 1]?.focus()
-        }
+        if (e.key === 'Backspace' && !otp[i] && i > 0) inputs.current[i - 1]?.focus()
         if (e.key === 'ArrowLeft'  && i > 0) inputs.current[i - 1]?.focus()
         if (e.key === 'ArrowRight' && i < 5) inputs.current[i + 1]?.focus()
     }
@@ -129,9 +206,9 @@ function StepOtp({ email, username, onVerified, onBack }) {
         setLoading(true)
         try {
             const res  = await fetch(`${API}/auth/verify-otp`, {
-                method: 'POST',
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, otp: code })
+                body:    JSON.stringify({ email, otp: code }),
             })
             const data = await res.json()
             if (!res.ok) return setError(data.error || 'Wrong OTP')
@@ -147,9 +224,9 @@ function StepOtp({ email, username, onVerified, onBack }) {
         setResending(true)
         try {
             await fetch(`${API}/auth/send-otp`, {
-                method: 'POST',
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, username })
+                body:    JSON.stringify({ email, username }),
             })
             setResendCd(30)
             setError('')
@@ -160,6 +237,9 @@ function StepOtp({ email, username, onVerified, onBack }) {
 
     return (
         <form onSubmit={handleVerify} id="signup-form">
+            {isReturning && username && (
+                <p id="returning-welcome">👋 Welcome back, <strong>{username}</strong>!</p>
+            )}
             <p id="otp-sent-msg">
                 Code sent to <strong>{email}</strong>
             </p>
@@ -189,7 +269,11 @@ function StepOtp({ email, username, onVerified, onBack }) {
                 id="signupSubmitBtn"
                 disabled={loading}
             >
-                {loading ? 'Verifying...' : 'Verify & Start Talking →'}
+                {loading
+                    ? 'Verifying...'
+                    : isReturning
+                        ? 'Verify & Log In →'
+                        : 'Verify & Start Talking →'}
             </button>
 
             <div id="otp-footer">
@@ -212,11 +296,16 @@ function StepOtp({ email, username, onVerified, onBack }) {
 // ── Main SignUp component ─────────────────────────────────────
 export default function SingUp({ setUsername }) {
     const navigate = useNavigate()
-    const [step,         setStep]        = useState('email')   // 'email' | 'otp'
-    const [pendingEmail, setPendingEmail] = useState('')
-    const [pendingName,  setPendingName]  = useState('')
 
-    // Check if they were bounced back due to guest limit
+    // 'new' | 'returning' | 'otp'
+    const [step,          setStep]         = useState(() => {
+        // If they've logged in before, default to returning-user (login) flow
+        return localStorage.getItem('ub_has_account') === '1' ? 'returning' : 'new'
+    })
+    const [pendingEmail,  setPendingEmail]  = useState('')
+    const [pendingName,   setPendingName]   = useState('')
+    const [isReturning,   setIsReturning]   = useState(false)
+
     const guestLimitHit = localStorage.getItem('ub_guest_limit') === '1'
     useEffect(() => {
         if (guestLimitHit) localStorage.removeItem('ub_guest_limit')
@@ -239,27 +328,25 @@ export default function SingUp({ setUsername }) {
             .catch(() => {})
     }, [])
 
-    function handleOtpSent(email, username) {
+    function handleOtpSent(email, username, returning) {
         setPendingEmail(email)
         setPendingName(username)
+        setIsReturning(returning)
         setStep('otp')
     }
 
     function handleVerified(token, username) {
         localStorage.removeItem('ub_guest')
         localStorage.setItem('ub_token', token)
+        localStorage.setItem('ub_has_account', '1')  // next visit defaults to login
         setUsername(username)
         navigate('/chat')
     }
 
     // ── Guest mode ────────────────────────────────────────────
     function getOrCreateDeviceId() {
-        // Use localStorage as primary store. Not perfect but works for most cases.
-        // Server-side deviceId check catches repeat guests even if they clear localStorage
-        // only if they forget to clear it — it's a friction layer, not a hard wall.
         let id = localStorage.getItem('ub_device_id')
         if (!id) {
-            // Generate a random 128-bit hex ID
             const arr = new Uint8Array(16)
             crypto.getRandomValues(arr)
             id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
@@ -278,6 +365,8 @@ export default function SingUp({ setUsername }) {
         setUsername(name)
         navigate('/chat')
     }
+
+    const showGuestCta = step !== 'otp'
 
     return (
         <div id="signupPage">
@@ -299,20 +388,44 @@ export default function SingUp({ setUsername }) {
                     </div>
                 )}
 
-                {step === 'email' && (
-                    <StepEmail onOtpSent={handleOtpSent} />
+                {/* ── Mode toggle tabs (new / returning) ───── */}
+                {step !== 'otp' && (
+                    <div id="auth-mode-tabs">
+                        <button
+                            className={`auth-tab${step === 'new' ? ' active' : ''}`}
+                            onClick={() => setStep('new')}
+                        >
+                            Sign Up
+                        </button>
+                        <button
+                            className={`auth-tab${step === 'returning' ? ' active' : ''}`}
+                            onClick={() => setStep('returning')}
+                        >
+                            Log In
+                        </button>
+                    </div>
+                )}
+
+                {step === 'new' && (
+                    <StepNewUser onOtpSent={handleOtpSent} />
+                )}
+                {step === 'returning' && (
+                    <StepReturningUser
+                        onOtpSent={handleOtpSent}
+                        onSwitchToNew={() => setStep('new')}
+                    />
                 )}
                 {step === 'otp' && (
                     <StepOtp
                         email={pendingEmail}
                         username={pendingName}
+                        isReturning={isReturning}
                         onVerified={handleVerified}
-                        onBack={() => setStep('email')}
+                        onBack={() => setStep(isReturning ? 'returning' : 'new')}
                     />
                 )}
 
-                {/* Guest CTA — only shown on the email step */}
-                {step === 'email' && (
+                {showGuestCta && (
                     <div id="signup-guest-cta">
                         <div id="signup-divider"><span>or</span></div>
                         <button id="guestBtn" onClick={handleGuest}>

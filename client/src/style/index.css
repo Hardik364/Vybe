@@ -302,6 +302,61 @@ input  { font-family: inherit; }
 #otp-resend-btn:hover:not(:disabled) { color: var(--accent-hover); }
 #otp-resend-btn:disabled { color: var(--text-muted); cursor: default; }
 
+/* ── Sign Up / Log In tabs ───────────────────────────────── */
+#auth-mode-tabs {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: var(--r-md);
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 4px;
+}
+
+.auth-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 0;
+    border-radius: calc(var(--r-md) - 2px);
+    cursor: pointer;
+    transition: background var(--t-fast), color var(--t-fast);
+}
+
+.auth-tab.active {
+    background: var(--surface-3);
+    color: var(--text-primary);
+}
+
+.auth-tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* ── Switch mode link ────────────────────────────────────── */
+#switch-mode-btn {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+    margin-top: 12px;
+    padding: 4px;
+    text-align: center;
+    transition: color var(--t-fast);
+}
+#switch-mode-btn:hover { color: var(--accent-hover); }
+
+/* ── Welcome back message ────────────────────────────────── */
+#returning-welcome {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+#returning-welcome strong { color: var(--text-primary); }
+
 /* ============================================================
    APP SHELL
    ============================================================ */

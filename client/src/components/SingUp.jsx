@@ -183,7 +183,7 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
     const [error,     setError]    = useState('')
     const [loading,   setLoading]  = useState(false)
     const [resending, setResending] = useState(false)
-    const [resendCd,  setResendCd] = useState(30)
+    const [resendCd,  setResendCd] = useState(60)
     const inputs = useRef([])
 
     useEffect(() => {
@@ -244,7 +244,7 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ email, username }),
             })
-            setResendCd(30)
+            setResendCd(60)
             setError('')
         } finally {
             setResending(false)

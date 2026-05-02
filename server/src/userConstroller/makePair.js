@@ -38,15 +38,19 @@ export default async function makePair(socket) {
 
         const parsedUserData = JSON.parse(rawUserData)
 
-        // Don't pair with self — check BOTH socket ID and username.
-        // Username check catches the refresh-ghost bug: same user reconnects
-        // with a new socket ID but same username, finds their own stale entry.
+        // Don't pair with self — check socket ID, username, AND email.
+        // - socketId:  catches same tab reconnecting fast
+        // - username:  catches ghost entries from refresh (same session)
+        // - email:     catches same person logging in twice with different
+        //              usernames (e.g. re-registering with same college email)
         const isSelf = parsedUserData.socketId === socket.id ||
                        (parsedUserData.username &&
-                        parsedUserData.username === socket.username)
+                        parsedUserData.username === socket.username) ||
+                       (socket.email && parsedUserData.email &&
+                        socket.email === parsedUserData.email)
         if (isSelf) {
             // Discard ghost entry — it's the same person, don't put it back
-            console.log(`[Pair] Discarded ghost entry for ${socket.username}`)
+            console.log(`[Pair] Discarded ghost entry for ${socket.username} (${socket.email || 'guest'})`)
             continue
         }
 

@@ -108,16 +108,28 @@ router.post('/verify-otp', async (req, res) => {
         await client.del(`otp:${emailLower}`)
         await client.del(`otp-attempts:${emailLower}`)
 
+        // ── Pin username to email (first login wins) ──────────
+        // If this email already has a saved username, use that one.
+        // This prevents the same person from getting a different username
+        // on every login and being matched with themselves.
+        const collegeDomain   = emailLower.split('@')[1]
+        const savedUsername   = await client.get(`user:username:${emailLower}`)
+        const finalUsername   = savedUsername || username
+
+        if (!savedUsername) {
+            // First time this email has verified — lock in the username
+            await client.set(`user:username:${emailLower}`, username)
+        }
+
         // Issue JWT (valid for 7 days)
-        const collegeDomain = emailLower.split('@')[1]
         const token = jwt.sign(
-            { email: emailLower, username, collegeDomain },
+            { email: emailLower, username: finalUsername, collegeDomain },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         )
 
-        console.log(`[Auth] Verified: ${username} (${emailLower})`)
-        res.json({ success: true, token, username, collegeDomain })
+        console.log(`[Auth] Verified: ${finalUsername} (${emailLower})${savedUsername ? ' [returning user]' : ' [new user]'}`)
+        res.json({ success: true, token, username: finalUsername, collegeDomain })
 
     } catch (err) {
         console.error('[verify-otp]', err)

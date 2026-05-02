@@ -25,6 +25,7 @@ export default async function addUserTODb(socket) {
         const result   = await client.rPush(queueKey, JSON.stringify({
             socketId:      socket.id,
             username:      socket.username,
+            email:         socket.email || null,   // used to prevent same-email self-match
             collegeDomain: socket.collegeDomain || 'global',
             tier:          socket.tier,
         }))

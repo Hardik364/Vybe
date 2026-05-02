@@ -222,7 +222,18 @@ input  { font-family: inherit; }
     text-align: center;
 }
 
-/* ── Signup error message ── */
+/* ── Signup error / info messages ── */
+.signup-info {
+    color: #4ade80;
+    font-size: 13px;
+    text-align: center;
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: rgba(74, 222, 128, 0.08);
+    border-radius: var(--r-sm);
+    border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
 .signup-error {
     color: var(--red);
     font-size: 13px;

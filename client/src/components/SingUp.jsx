@@ -5,14 +5,16 @@ const API = import.meta.env.VITE_APP_WEBSOCKET_URL
 
 // ── Step 1a: NEW USER — name + email ─────────────────────────
 function StepNewUser({ onOtpSent }) {
-    const [username, setUsername] = useState('')
-    const [email,    setEmail]    = useState('')
-    const [error,    setError]    = useState('')
-    const [loading,  setLoading]  = useState(false)
+    const [username,    setUsername]    = useState('')
+    const [email,       setEmail]       = useState('')
+    const [error,       setError]       = useState('')
+    const [loading,     setLoading]     = useState(false)
+    const [alreadyExists, setAlreadyExists] = useState(false)
 
     async function handleSubmit(e) {
         e.preventDefault()
         setError('')
+        setAlreadyExists(false)
         const u = username.trim()
         const m = email.trim().toLowerCase()
         if (!u) return setError('Enter your name')
@@ -27,6 +29,15 @@ function StepNewUser({ onOtpSent }) {
             })
             const data = await res.json()
             if (!res.ok) return setError(data.error || 'Something went wrong')
+
+            // Email already has an account — switch to returning flow
+            if (data.isReturning) {
+                setAlreadyExists(true)
+                // Auto-proceed to OTP as returning user after showing message briefly
+                setTimeout(() => onOtpSent(m, data.username, true), 1800)
+                return
+            }
+
             onOtpSent(m, u, false)
         } catch {
             setError('Cannot reach server. Is it running?')
@@ -62,14 +73,19 @@ function StepNewUser({ onOtpSent }) {
             </div>
 
             {error && <p className="signup-error">{error}</p>}
+            {alreadyExists && (
+                <p className="signup-info">
+                    ✅ Account found! Logging you in as your existing account…
+                </p>
+            )}
 
             <button
                 type="submit"
                 className="singupInputBox"
                 id="signupSubmitBtn"
-                disabled={loading}
+                disabled={loading || alreadyExists}
             >
-                {loading ? 'Sending OTP...' : 'Send Verification Code →'}
+                {loading ? 'Checking...' : alreadyExists ? 'Redirecting…' : 'Send Verification Code →'}
             </button>
 
             <p id="signup-disclaimer">

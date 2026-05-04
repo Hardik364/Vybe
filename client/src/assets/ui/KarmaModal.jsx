@@ -1,7 +1,6 @@
 export default function KarmaModal({ strangerUsername, strangerUserId, socket, onRate }) {
 
     function handleRate(rating) {
-        // Send rating to server (null = skipped)
         if (rating && socket && strangerUserId) {
             socket.emit('rateUser', { to: strangerUserId, rating })
         }
@@ -11,9 +10,11 @@ export default function KarmaModal({ strangerUsername, strangerUserId, socket, o
     return (
         <div id="karmaOverlay">
             <div id="karmaModal">
-                <h3 id="karma-title">How was your conversation?</h3>
+                <div className="sheet-handle"></div>
+
+                <h3 id="karma-title">⭐ How was your conversation?</h3>
                 <p id="karma-subtitle">
-                    Anonymous — {strangerUsername || 'they'} won't know your rating
+                    🤫 Anonymous — {strangerUsername || 'they'} won't know your rating
                 </p>
 
                 <div id="karma-buttons">
@@ -37,13 +38,13 @@ export default function KarmaModal({ strangerUsername, strangerUserId, socket, o
                         className="karma-btn karma-bad"
                         onClick={() => handleRate('disrespectful')}
                     >
-                        <span className="karma-emoji">😠</span>
+                        <span className="karma-emoji">🚩</span>
                         <span className="karma-label">Report</span>
                     </button>
                 </div>
 
                 <button id="karma-skip" onClick={() => handleRate(null)}>
-                    Skip
+                    Skip for now
                 </button>
             </div>
         </div>

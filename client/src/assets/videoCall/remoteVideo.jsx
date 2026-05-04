@@ -4,27 +4,26 @@ export default function RemoteVideo({ remoteVideo, peerConnection, setChangeCamO
 
     useEffect(() => {
         if (peerConnection) {
-            // peerConnection.ontrack = ({ track, streams }) => {
-            //     track.onunmute = () => {
-            //       if (remoteVideo.current.srcObject) {
-            //         return;
-            //       }
-            //       remoteVideo.current.srcObject = streams[0];
-            //     };
-            //   }
             peerConnection.addEventListener('track', async (event) => {
                 const [remoteStream] = event.streams
                 remoteVideo.current.srcObject = remoteStream
             })
 
             return () => {
-                if(remoteVideo.current) remoteVideo.current.srcObject = null
+                if (remoteVideo.current) remoteVideo.current.srcObject = null
             }
         }
     }, [peerConnection])
 
-    return <video id="remoteVideo"
-        ref={remoteVideo} onClick={() => setChangeCamOverly(true)} autoPlay playsInline controls={false}
-    ></video>
-
+    return (
+        <div id="remoteVideoWrap">
+            <span className="video-label">🧑 Stranger</span>
+            <video
+                id="remoteVideo"
+                ref={remoteVideo}
+                onClick={() => setChangeCamOverly(true)}
+                autoPlay playsInline controls={false}
+            />
+        </div>
+    )
 }

@@ -29,19 +29,19 @@ export default function ChatPage({ username, setUsername }) {
     const [showKarma, setShowKarma]           = useState(false)
     const [lastStrangerUserId, setLastStrangerUserId] = useState(null)
 
-    // Phase 2: server-driven prompt
+    // Prompt
     const [activePrompt, setActivePrompt]     = useState(null)
 
-    // Phase 3: live count
+    // Live count
     const [liveCount, setLiveCount]           = useState(0)
 
-    // Notify Me: extract college domain from JWT for subscription key
+    // College domain (for Notify Me)
     const [collegeDomain, setCollegeDomain]   = useState('global')
 
-    // Phase 5: report
+    // Report
     const [reportSent, setReportSent]         = useState(false)
 
-    // Phase 6: tier
+    // Tier
     const [showUpgrade, setShowUpgrade]       = useState(false)
     const [userTier,    setUserTier]          = useState('free')
 
@@ -55,7 +55,7 @@ export default function ChatPage({ username, setUsername }) {
     usePeerConnection(setPeerConnection)
     startWebRtcNegotiation(socket, strangerdata, peerConnection, stream)
 
-    // ── Phase 2: prompt events ───────────────────────────────
+    // Prompt events
     useEffect(() => {
         if (!socket) return
         socket.on('showPrompt', (prompt) => setActivePrompt(prompt))
@@ -66,25 +66,23 @@ export default function ChatPage({ username, setUsername }) {
         }
     }, [socket])
 
-    // Auto-show prompt sent with the match payload
     useEffect(() => {
         if (strangerdata?.prompt) setActivePrompt(strangerdata.prompt)
     }, [strangerdata])
 
-    // Clear prompt + report state when partner changes
     useEffect(() => {
         setActivePrompt(null)
         setReportSent(false)
     }, [strangerUserId])
 
-    // ── Phase 3: live count ──────────────────────────────────
+    // Live count
     useEffect(() => {
         if (!socket) return
         socket.on('liveCount', (count) => setLiveCount(count))
         return () => socket.off('liveCount')
     }, [socket])
 
-    // ── Phase 6: load tier ───────────────────────────────────
+    // Load tier
     useEffect(() => {
         const token = localStorage.getItem('ub_token')
         if (!token) return
@@ -101,13 +99,13 @@ export default function ChatPage({ username, setUsername }) {
             .catch(() => {})
     }, [])
 
-    // ── Prompt handlers ──────────────────────────────────────
+    // Prompt handlers
     function handlePromptToggle() {
         if (!socket || !strangerUserId) return
         if (activePrompt) {
             socket.emit('dismissPrompt', { to: strangerUserId })
         } else {
-            socket.emit('requestPrompt', { to: strangerUserId })
+            socket.emit('requestPrompt', { to: strangerUserId, excludeId: null })
         }
     }
 
@@ -121,7 +119,7 @@ export default function ChatPage({ username, setUsername }) {
         socket.emit('dismissPrompt', { to: strangerUserId })
     }
 
-    // ── New user / post-call flow ────────────────────────────
+    // New user / post-call flow
     function handleNewUser() {
         if (connectionStatus) {
             setLastStrangerUserId(strangerUserId)
@@ -132,7 +130,6 @@ export default function ChatPage({ username, setUsername }) {
     }
 
     function handleConnect() {
-        // PostCallScreen handles the socket emit — just update local UI
         setShowPostCall(false)
         setShowKarma(true)
     }
@@ -169,7 +166,7 @@ export default function ChatPage({ username, setUsername }) {
             />
 
             <div id="chatPage">
-                {/* Video panel */}
+                {/* ── Video panel ── */}
                 <div id="videoCall">
                     <ChangeLocalMediaStream
                         peerConnection={peerConnection}
@@ -197,7 +194,7 @@ export default function ChatPage({ username, setUsername }) {
                     />
                 </div>
 
-                {/* Messaging panel */}
+                {/* ── Messaging panel ── */}
                 <div id="messaging">
                     {activePrompt && (
                         <PromptCard
@@ -223,12 +220,11 @@ export default function ChatPage({ username, setUsername }) {
                                 disabled={reportSent}
                                 title="Report this user for inappropriate behaviour"
                             >
-                                {reportSent ? '✓ Reported' : '🚩 Report'}
+                                {reportSent ? '✅ Reported' : '🚩 Report'}
                             </button>
                         </div>
                     )}
 
-                    {/* Notify Me — only when nobody is waiting and not in a call */}
                     {!connectionStatus && liveCount === 0 && (
                         <NotifyMe collegeDomain={collegeDomain} />
                     )}

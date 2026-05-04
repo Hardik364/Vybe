@@ -5,10 +5,10 @@ const API = import.meta.env.VITE_APP_WEBSOCKET_URL
 
 // ── Step 1a: NEW USER — name + email ─────────────────────────
 function StepNewUser({ onOtpSent }) {
-    const [username,    setUsername]    = useState('')
-    const [email,       setEmail]       = useState('')
-    const [error,       setError]       = useState('')
-    const [loading,     setLoading]     = useState(false)
+    const [username,      setUsername]    = useState('')
+    const [email,         setEmail]       = useState('')
+    const [error,         setError]       = useState('')
+    const [loading,       setLoading]     = useState(false)
     const [alreadyExists, setAlreadyExists] = useState(false)
 
     async function handleSubmit(e) {
@@ -30,10 +30,8 @@ function StepNewUser({ onOtpSent }) {
             const data = await res.json()
             if (!res.ok) return setError(data.error || 'Something went wrong')
 
-            // Email already has an account — switch to returning flow
             if (data.isReturning) {
                 setAlreadyExists(true)
-                // Auto-proceed to OTP as returning user after showing message briefly
                 setTimeout(() => onOtpSent(m, data.username, true), 1800)
                 return
             }
@@ -72,10 +70,10 @@ function StepNewUser({ onOtpSent }) {
                 />
             </div>
 
-            {error && <p className="signup-error">{error}</p>}
+            {error && <p className="signup-error">⚠️ {error}</p>}
             {alreadyExists && (
                 <p className="signup-info">
-                    ✅ Account found! Logging you in as your existing account…
+                    ✅ Account found! Logging you in…
                 </p>
             )}
 
@@ -85,12 +83,12 @@ function StepNewUser({ onOtpSent }) {
                 id="signupSubmitBtn"
                 disabled={loading || alreadyExists}
             >
-                {loading ? 'Checking...' : alreadyExists ? 'Redirecting…' : 'Send Verification Code →'}
+                {loading ? '⏳ Checking...' : alreadyExists ? '↗️ Redirecting…' : '📬 Send Verification Code →'}
             </button>
 
             <p id="signup-disclaimer">
                 {import.meta.env.VITE_APP_ENV === 'production'
-                    ? 'College email required — keeps UniBuddy student-only'
+                    ? '🔒 College email required — keeps UniBuddy student-only'
                     : '🛠 Dev mode: any email works for testing'}
             </p>
         </form>
@@ -118,7 +116,6 @@ function StepReturningUser({ onOtpSent, onSwitchToNew }) {
             })
             const data = await res.json()
             if (!res.ok) {
-                // If the server says this email has no account, switch to new-user flow
                 if (res.status === 400 && data.error?.includes('Username is required')) {
                     setError('No account found for this email. Sign up instead.')
                 } else {
@@ -128,7 +125,6 @@ function StepReturningUser({ onOtpSent, onSwitchToNew }) {
             }
 
             if (!data.isReturning) {
-                // Email exists but no username saved — treat as new user
                 setError('No account found. Please sign up with your name first.')
                 return
             }
@@ -155,7 +151,7 @@ function StepReturningUser({ onOtpSent, onSwitchToNew }) {
                 />
             </div>
 
-            {error && <p className="signup-error">{error}</p>}
+            {error && <p className="signup-error">⚠️ {error}</p>}
 
             <button
                 type="submit"
@@ -163,7 +159,7 @@ function StepReturningUser({ onOtpSent, onSwitchToNew }) {
                 id="signupSubmitBtn"
                 disabled={loading}
             >
-                {loading ? 'Sending OTP...' : 'Send Login Code →'}
+                {loading ? '⏳ Sending OTP...' : '🔑 Send Login Code →'}
             </button>
 
             <button
@@ -171,7 +167,7 @@ function StepReturningUser({ onOtpSent, onSwitchToNew }) {
                 id="switch-mode-btn"
                 onClick={onSwitchToNew}
             >
-                Not registered? Sign up here →
+                ✨ Not registered? Sign up here →
             </button>
         </form>
     )
@@ -257,7 +253,7 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
                 <p id="returning-welcome">👋 Welcome back, <strong>{username}</strong>!</p>
             )}
             <p id="otp-sent-msg">
-                Code sent to <strong>{email}</strong>
+                📬 Code sent to <strong>{email}</strong>
             </p>
 
             <div id="otp-inputs" onPaste={handlePaste}>
@@ -277,7 +273,7 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
                 ))}
             </div>
 
-            {error && <p className="signup-error">{error}</p>}
+            {error && <p className="signup-error">⚠️ {error}</p>}
 
             <button
                 type="submit"
@@ -286,10 +282,10 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
                 disabled={loading}
             >
                 {loading
-                    ? 'Verifying...'
+                    ? '⏳ Verifying...'
                     : isReturning
-                        ? 'Verify & Log In →'
-                        : 'Verify & Start Talking →'}
+                        ? '✅ Verify & Log In →'
+                        : '🚀 Verify & Start Talking →'}
             </button>
 
             <div id="otp-footer">
@@ -302,7 +298,7 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
                     onClick={handleResend}
                     disabled={resendCd > 0 || resending}
                 >
-                    {resendCd > 0 ? `Resend in ${resendCd}s` : resending ? 'Sending...' : 'Resend code'}
+                    {resendCd > 0 ? `🕐 Resend in ${resendCd}s` : resending ? '⏳ Sending...' : '🔄 Resend code'}
                 </button>
             </div>
         </form>
@@ -313,14 +309,12 @@ function StepOtp({ email, username, isReturning, onVerified, onBack }) {
 export default function SingUp({ setUsername }) {
     const navigate = useNavigate()
 
-    // 'new' | 'returning' | 'otp'
-    const [step,          setStep]         = useState(() => {
-        // If they've logged in before, default to returning-user (login) flow
-        return localStorage.getItem('ub_has_account') === '1' ? 'returning' : 'new'
-    })
-    const [pendingEmail,  setPendingEmail]  = useState('')
-    const [pendingName,   setPendingName]   = useState('')
-    const [isReturning,   setIsReturning]   = useState(false)
+    const [step,         setStep]        = useState(() =>
+        localStorage.getItem('ub_has_account') === '1' ? 'returning' : 'new'
+    )
+    const [pendingEmail, setPendingEmail] = useState('')
+    const [pendingName,  setPendingName]  = useState('')
+    const [isReturning,  setIsReturning]  = useState(false)
 
     const guestLimitHit = localStorage.getItem('ub_guest_limit') === '1'
     useEffect(() => {
@@ -354,12 +348,11 @@ export default function SingUp({ setUsername }) {
     function handleVerified(token, username) {
         localStorage.removeItem('ub_guest')
         localStorage.setItem('ub_token', token)
-        localStorage.setItem('ub_has_account', '1')  // next visit defaults to login
+        localStorage.setItem('ub_has_account', '1')
         setUsername(username)
         navigate('/chat')
     }
 
-    // ── Guest mode ────────────────────────────────────────────
     function getOrCreateDeviceId() {
         let id = localStorage.getItem('ub_device_id')
         if (!id) {
@@ -386,16 +379,79 @@ export default function SingUp({ setUsername }) {
 
     return (
         <div id="signupPage">
-            <div id="signup-glow"></div>
-
-            <div id="signup-card">
-                <div id="signup-logo">
-                    <span id="signup-logo-spark">✦</span>
-                    UniBuddy
+            {/* ── Left hero panel ── */}
+            <div className="signup-hero">
+                <div className="signup-hero-brand">
+                    <span className="signup-hero-spark">✦</span>
+                    <span className="signup-hero-wordmark">UniBuddy</span>
                 </div>
 
-                <p id="signup-tagline">
-                    One stranger. Real talk. Your college.
+                <h1 className="signup-hero-headline">
+                    Meet strangers.<br />
+                    <span className="hl-accent">From your college.</span>
+                </h1>
+
+                <p className="signup-hero-sub">
+                    🎙️ Voice-first anonymous matching — open the app and you're instantly connected with a real student from your college. No profiles, no swiping.
+                </p>
+
+                {/* Floating mood cards */}
+                <div className="signup-cards">
+                    <div className="signup-mood-card">
+                        <div className="smc-avatar">🎓</div>
+                        <div>
+                            <p className="smc-name">Riya · IIT Bombay</p>
+                            <p className="smc-text">"Had the most real conversation in months 🤯"</p>
+                        </div>
+                    </div>
+                    <div className="signup-mood-card">
+                        <div className="smc-avatar">💬</div>
+                        <div>
+                            <p className="smc-name">Arjun · BITS Pilani</p>
+                            <p className="smc-text">"We talked for 2 hours, now we're friends 😄"</p>
+                        </div>
+                    </div>
+                    <div className="signup-mood-card">
+                        <div className="smc-avatar">✨</div>
+                        <div>
+                            <p className="smc-name">Priya · Delhi University</p>
+                            <p className="smc-text">"Better than any social app I've used 🔥"</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats */}
+                <div className="signup-stats">
+                    <div className="signup-stat">
+                        <div className="signup-stat-num">500+</div>
+                        <div className="signup-stat-label">🏫 Colleges</div>
+                    </div>
+                    <div className="signup-stat">
+                        <div className="signup-stat-num">10k+</div>
+                        <div className="signup-stat-label">💬 Conversations</div>
+                    </div>
+                    <div className="signup-stat">
+                        <div className="signup-stat-num">Free</div>
+                        <div className="signup-stat-label">🎁 Always free tier</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Right form panel ── */}
+            <div className="signup-form-panel">
+                <h2 className="signup-form-title">
+                    {step === 'otp'
+                        ? '🔐 Check your inbox'
+                        : step === 'returning'
+                            ? '👋 Welcome back'
+                            : '✨ Get started'}
+                </h2>
+                <p className="signup-form-sub">
+                    {step === 'otp'
+                        ? 'Enter the 6-digit code we sent you'
+                        : step === 'returning'
+                            ? 'Log in with your college email'
+                            : 'Join thousands of students already talking'}
                 </p>
 
                 {guestLimitHit && (
@@ -404,20 +460,20 @@ export default function SingUp({ setUsername }) {
                     </div>
                 )}
 
-                {/* ── Mode toggle tabs (new / returning) ───── */}
+                {/* Mode toggle tabs */}
                 {step !== 'otp' && (
                     <div id="auth-mode-tabs">
                         <button
                             className={`auth-tab${step === 'new' ? ' active' : ''}`}
                             onClick={() => setStep('new')}
                         >
-                            Sign Up
+                            ✨ Sign Up
                         </button>
                         <button
                             className={`auth-tab${step === 'returning' ? ' active' : ''}`}
                             onClick={() => setStep('returning')}
                         >
-                            Log In
+                            👋 Log In
                         </button>
                     </div>
                 )}
@@ -447,7 +503,7 @@ export default function SingUp({ setUsername }) {
                         <button id="guestBtn" onClick={handleGuest}>
                             👀 Try as Guest — 1 free call, no signup
                         </button>
-                        <p id="guest-cta-note">No email needed · Just jump right in</p>
+                        <p id="guest-cta-note">No email needed · Just jump right in 🚀</p>
                     </div>
                 )}
             </div>

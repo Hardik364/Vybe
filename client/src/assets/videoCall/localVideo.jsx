@@ -16,7 +16,6 @@ export default function LocalVideo({
     const [partnerVideoOn, setPartnerVideoOn] = useState(false)
     const [videoLoading,   setVideoLoading]   = useState(false)
 
-    // Track the video sender so we can replace/remove the track later
     const videoSenderRef = useRef(null)
 
     // ── Open audio-only stream on mount ─────────────────────────
@@ -26,7 +25,6 @@ export default function LocalVideo({
 
         async function initStream() {
             try {
-                // Audio only — no camera permission requested at start
                 streamInstance = await openMediaStream(null, true)
                 if (localVideo.current) localVideo.current.srcObject = streamInstance
                 setStream(streamInstance)
@@ -59,7 +57,6 @@ export default function LocalVideo({
         if (!strangerUserId) return
         setPartnerVideoOn(false)
 
-        // Turn off video if it was on from the previous call
         if (videoEnabled && stream) {
             stream.getVideoTracks().forEach(t => { t.stop(); t.enabled = false })
             if (videoSenderRef.current) {
@@ -75,7 +72,6 @@ export default function LocalVideo({
         if (!socket || !strangerUserId || !stream) return
 
         if (videoEnabled) {
-            // Turn OFF: stop tracks and remove from peer connection
             stream.getVideoTracks().forEach(t => { t.stop(); stream.removeTrack(t) })
             if (videoSenderRef.current) {
                 try { peerConnection?.removeTrack(videoSenderRef.current) } catch {}
@@ -85,18 +81,15 @@ export default function LocalVideo({
             setVideoEnabled(false)
             socket.emit('videoOff', { to: strangerUserId })
         } else {
-            // Turn ON: request camera permission and add track to peer connection
             setVideoLoading(true)
             try {
                 const videoStream = await openMediaStream(selectedDeviceId, false)
                 const videoTrack  = videoStream.getVideoTracks()[0]
                 if (!videoTrack) throw new Error('No video track obtained')
 
-                // Add video track to the existing audio stream so <video> shows both
                 stream.addTrack(videoTrack)
                 if (localVideo.current) localVideo.current.srcObject = stream
 
-                // Add to peer connection — triggers renegotiation automatically
                 if (peerConnection) {
                     videoSenderRef.current = peerConnection.addTrack(videoTrack, stream)
                 }
@@ -105,9 +98,8 @@ export default function LocalVideo({
                 socket.emit('videoOn', { to: strangerUserId })
             } catch (err) {
                 console.error('[LocalVideo] Enable video failed:', err.name, err.message)
-                // Camera denied or not available — show a friendly message
                 if (err.name === 'NotAllowedError') {
-                    alert('Camera access denied. Please allow camera access in your browser settings.')
+                    alert('📷 Camera access denied. Please allow camera access in your browser settings.')
                 }
             } finally {
                 setVideoLoading(false)
@@ -117,6 +109,8 @@ export default function LocalVideo({
 
     return (
         <div id="localVideoWrap">
+            <span className="video-label">🎙️ You</span>
+
             <video
                 id="localVideo"
                 ref={localVideo}

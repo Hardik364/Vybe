@@ -22,7 +22,6 @@ const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 export default function ChatPage() {
   const router = useRouter()
 
-  // Auth
   const [username, setUsername] = useState(null)
   useEffect(() => {
     const u = localStorage.getItem('ub_username')
@@ -33,7 +32,6 @@ export default function ChatPage() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
   }, [])
 
-  // Core state
   const [message, setMessage]               = useState([])
   const [peerConnection, setPeerConnection] = useState(null)
   const [changeCamOverlay, setChangeCamOverlay] = useState(false)
@@ -41,8 +39,6 @@ export default function ChatPage() {
   const [stream, setStream]                 = useState(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const [strangerData, setStrangerData]     = useState(null)
-
-  // UI
   const [showPostCall, setShowPostCall]     = useState(false)
   const [showKarma, setShowKarma]           = useState(false)
   const [lastStrangerId, setLastStrangerId] = useState(null)
@@ -62,7 +58,6 @@ export default function ChatPage() {
   )
   usePeerConnection(setPeerConnection)
 
-  // WebRTC negotiation
   useEffect(() => {
     if (!strangerData || !peerConnection || !stream || !socket) return
     signalingRef.current = webrtcSignaling(socket, peerConnection, strangerData)
@@ -80,7 +75,6 @@ export default function ChatPage() {
     }
   }, [stream, strangerData])
 
-  // Prompt events
   useEffect(() => {
     if (!socket) return
     socket.on('showPrompt', p => setActivePrompt(p))
@@ -91,14 +85,12 @@ export default function ChatPage() {
   useEffect(() => { if (strangerData?.prompt) setActivePrompt(strangerData.prompt) }, [strangerData])
   useEffect(() => { setActivePrompt(null); setReportSent(false) }, [strangerUserId])
 
-  // Live count
   useEffect(() => {
     if (!socket) return
     socket.on('liveCount', c => setLiveCount(c))
     return () => socket.off('liveCount')
   }, [socket])
 
-  // Load tier
   useEffect(() => {
     const token = localStorage.getItem('ub_token')
     if (!token) return
@@ -140,7 +132,7 @@ export default function ChatPage() {
   if (!username) return null
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-base">
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
       <Navbar
         strangerUsername={strangerUsername}
         connectionStatus={connectionStatus}
@@ -154,14 +146,9 @@ export default function ChatPage() {
         onCommunity={() => router.push('/community')}
       />
 
-      <div
-        className="flex flex-1 overflow-hidden p-3 gap-2.5"
-        style={{
-          '--light-chat-bg': 'linear-gradient(135deg,oklch(94% 0.015 280 / 0.5),oklch(94% 0.012 160 / 0.3))',
-        }}
-      >
+      <div className="chat-layout">
         {/* Video panel — 38% */}
-        <div className="flex flex-col gap-2 shrink-0 overflow-hidden" style={{ width: '38%', minWidth: 260 }}>
+        <div className="video-panel">
           <ChangeCam
             peerConnection={peerConnection}
             localVideoRef={localVideoRef}
@@ -188,12 +175,7 @@ export default function ChatPage() {
         </div>
 
         {/* Message panel */}
-        <div
-          className="flex-1 flex flex-col rounded-lg border border-bdr overflow-hidden min-w-0 shadow-sm bg-surf"
-          style={{
-            boxShadow: 'var(--sh-sm)',
-          }}
-        >
+        <div className="msg-panel">
           {activePrompt && (
             <PromptCard
               prompt={activePrompt}
@@ -213,15 +195,11 @@ export default function ChatPage() {
           />
 
           {connectionStatus && (
-            <div className="px-3 py-1 flex justify-end shrink-0">
+            <div className="report-bar">
               <button
                 onClick={handleReport}
                 disabled={reportSent}
-                className={`text-[12px] px-2.5 py-1 rounded-2xl border transition-all ${
-                  reportSent
-                    ? 'text-green border-transparent cursor-default'
-                    : 'text-t4 border-transparent hover:border-red hover:text-red hover:bg-red-sub'
-                }`}
+                className={`report-btn${reportSent ? ' reported' : ''}`}
               >
                 {reportSent ? '✅ Reported' : '🚩 Report'}
               </button>

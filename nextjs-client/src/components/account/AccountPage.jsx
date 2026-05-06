@@ -7,17 +7,17 @@ import UpgradeModal from '@/components/modals/UpgradeModal'
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
 const TIER_INFO = {
-  free: { label: 'Free',  color: 'oklch(55% 0.01 265)', scope: 'Your college only' },
-  plus: { label: 'Plus',  color: 'var(--accent)',        scope: 'Same state colleges' },
-  pro:  { label: 'Pro',   color: 'var(--amber)',         scope: 'Any college globally' },
+  free: { label: 'Free', color: 'oklch(55% 0.01 265)', scope: 'Your college only' },
+  plus: { label: 'Plus', color: 'var(--accent)',        scope: 'Same state colleges' },
+  pro:  { label: 'Pro',  color: 'var(--amber)',         scope: 'Any college globally' },
 }
 
 export default function AccountPage() {
   const router = useRouter()
-  const [user,     setUser]     = useState(null)
-  const [tier,     setTier]     = useState('free')
-  const [history,  setHistory]  = useState([])
-  const [showUp,   setShowUp]   = useState(false)
+  const [user,    setUser]    = useState(null)
+  const [tier,    setTier]    = useState('free')
+  const [history, setHistory] = useState([])
+  const [showUp,  setShowUp]  = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('ub_token')
@@ -41,102 +41,141 @@ export default function AccountPage() {
   const info = TIER_INFO[tier] || TIER_INFO.free
 
   if (!user) return (
-    <div className="absolute inset-0 flex items-center justify-center">
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spinAnim .9s linear infinite' }} />
     </div>
   )
 
   return (
-    <div className="absolute inset-0 bg-base flex flex-col overflow-hidden">
+    <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-base)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Top nav */}
-      <nav className="h-14 flex items-center px-5 gap-4 border-b z-10 shrink-0 backdrop-blur-2xl" style={{ background: 'var(--glass)', borderColor: 'var(--glass-b)' }}>
+      <nav className="navbar">
         <button
           onClick={() => router.push('/chat')}
-          className="text-[14px] font-bold text-accent flex items-center gap-1.5 transition-opacity hover:opacity-75"
+          style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity var(--t-fast)' }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+          onMouseLeave={e => e.currentTarget.style.opacity = ''}
         >
           ← Back to Chat
         </button>
-        <span className="font-display text-[16px] font-black text-t1">Account</span>
-        <div className="ml-auto flex items-center gap-2">
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 900, color: 'var(--t1)' }}>Account</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
         </div>
       </nav>
 
       {/* Split body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left — cards */}
-        <div className="w-[420px] min-w-[360px] overflow-y-auto p-7 flex flex-col gap-3.5 border-r border-bdr shrink-0">
-          {/* Profile */}
-          <Card>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-[26px] font-black shrink-0 font-display"
-                style={{
-                  background: 'linear-gradient(135deg,var(--accent),oklch(58% 0.24 310))',
-                  boxShadow: '0 6px 24px var(--accent-glow)',
-                }}
-              >
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Left column — cards */}
+        <div className="acc-left">
+          {/* Profile card */}
+          <div className="acc-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div className="acc-avatar">
                 {user.username?.[0]?.toUpperCase()}
               </div>
               <div>
-                <div className="font-display text-[22px] font-black text-t1">{user.username}</div>
-                <div className="text-[13px] text-t3 mt-0.5">
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 900, color: 'var(--t1)' }}>
+                  {user.username}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>
                   🎓 Logged in via college email · {user.college || 'Verified Student'}
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
 
-          {/* Plan */}
-          <Card>
-            <div className="text-[11px] font-black text-t3 uppercase tracking-[0.8px]">Current Plan</div>
-            <div className="flex items-center gap-3">
-              <span className="px-4 py-[5px] rounded-2xl text-[13px] font-black text-white" style={{ background: info.color }}>
+          {/* Plan card */}
+          <div className="acc-card">
+            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              Current Plan
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                padding: '5px 16px', borderRadius: 'var(--r-full)',
+                fontSize: 13, fontWeight: 900, color: '#fff',
+                background: info.color,
+              }}>
                 {info.label}
               </span>
-              <span className="text-[14px] text-t2">{info.scope}</span>
+              <span style={{ fontSize: 14, color: 'var(--t2)' }}>{info.scope}</span>
             </div>
             {tier === 'free' && (
-              <p className="text-[13px] text-t3 leading-[1.5]">You're on the free plan. Upgrade to match students beyond your college. 🚀</p>
+              <p style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.5 }}>
+                You're on the free plan. Upgrade to match students beyond your college. 🚀
+              </p>
             )}
             <button
               onClick={() => setShowUp(true)}
-              className="py-[13px] rounded-md text-[14px] font-black text-white border-none transition-all hover:translate-y-[-1px] hover:shadow-md relative overflow-hidden"
-              style={{ background: tier === 'free' ? 'var(--accent)' : info.color }}
+              style={{
+                padding: '13px 0', borderRadius: 'var(--r-md)',
+                fontSize: 14, fontWeight: 900, color: '#fff', border: 'none',
+                background: tier === 'free' ? 'var(--accent)' : info.color,
+                cursor: 'pointer', transition: 'all var(--t-fast)',
+                position: 'relative', overflow: 'hidden',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--sh-md)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
             >
-              <span className="absolute inset-0 bg-[linear-gradient(135deg,oklch(100%_0_0/0.1),transparent)] pointer-events-none" />
+              <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,oklch(100% 0 0/0.1),transparent)', pointerEvents: 'none' }} />
               {tier === 'free' ? '⚡ Upgrade Plan' : '🔄 Change Plan'}
             </button>
-          </Card>
+          </div>
 
-          {/* History */}
-          <Card>
-            <div className="text-[11px] font-black text-t3 uppercase tracking-[0.8px]">Purchase History</div>
-            <div className="flex flex-col gap-2">
+          {/* Purchase history card */}
+          <div className="acc-card">
+            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              Purchase History
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {history.length === 0 ? (
-                <p className="text-[14px] text-t4">No purchases yet</p>
+                <p style={{ fontSize: 14, color: 'var(--t4)' }}>No purchases yet</p>
               ) : history.map((h, i) => (
-                <div key={i} className="flex items-center justify-between px-3.5 py-[11px] bg-elev rounded-md transition-all hover:bg-float">
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '11px 14px', background: 'var(--bg-elev)',
+                    borderRadius: 'var(--r-md)', transition: 'background var(--t-fast)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-float)'}
+                  onMouseLeave={e => e.currentTarget.style.background = ''}
+                >
                   <div>
-                    <div className="text-[14px] font-bold text-t1">{h.planId}</div>
-                    <div className="text-[12px] text-t4 mt-0.5">{new Date(h.activatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t1)' }}>{h.planId}</div>
+                    <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
+                      {new Date(h.activatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
                   </div>
-                  <span className="text-[13px] font-black" style={{ color: TIER_INFO[h.tier]?.color }}>{TIER_INFO[h.tier]?.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: TIER_INFO[h.tier]?.color }}>
+                    {TIER_INFO[h.tier]?.label}
+                  </span>
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
 
-          {/* Logout */}
-          <div
-            className="bg-surf rounded-xl p-[22px] flex flex-col gap-3 shadow-sm"
-            style={{ border: '1px solid oklch(62% 0.24 25 / 0.2)' }}
-          >
-            <div className="text-[11px] font-black text-t3 uppercase tracking-[0.8px]">Sign Out</div>
+          {/* Sign out */}
+          <div style={{
+            background: 'var(--bg-surf)',
+            border: '1px solid oklch(62% 0.24 25 / 0.2)',
+            borderRadius: 'var(--r-xl)', padding: 22,
+            display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              Sign Out
+            </div>
             <button
               onClick={logout}
-              className="py-[13px] rounded-md text-[14px] font-bold border transition-all hover:bg-red-sub"
-              style={{ color: 'var(--red)', borderColor: 'var(--red)', background: 'none' }}
+              style={{
+                padding: '13px 0', borderRadius: 'var(--r-md)',
+                fontSize: 14, fontWeight: 700,
+                border: '1px solid var(--red)', color: 'var(--red)',
+                background: 'none', cursor: 'pointer',
+                transition: 'background var(--t-fast)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--red-sub)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
             >
               🚪 Log Out
             </button>
@@ -144,26 +183,34 @@ export default function AccountPage() {
         </div>
 
         {/* Right — 3D orbit canvas */}
-        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-base">
+        <div className="acc-right">
           <AccountCanvas />
 
           {/* Overlay content */}
-          <div className="relative z-[2] flex flex-col items-center gap-7 p-10 text-center pointer-events-none w-full">
+          <div style={{
+            position: 'relative', zIndex: 2,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 28, padding: 40, textAlign: 'center',
+            pointerEvents: 'none', width: '100%',
+          }}>
             <div>
-              <p className="text-[11px] font-black tracking-[2px] uppercase text-accent mb-3">Your Network</p>
-              <h2
-                className="font-display font-black text-t1 tracking-[-1px] leading-[1.1] mb-2.5"
-                style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}
-              >
+              <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>
+                Your Network
+              </p>
+              <h2 style={{
+                fontFamily: 'var(--font-display)', fontWeight: 900, color: 'var(--t1)',
+                letterSpacing: '-1px', lineHeight: 1.1, marginBottom: 10,
+                fontSize: 'clamp(28px, 3vw, 42px)',
+              }}>
                 Students.<br />Connected.
               </h2>
-              <p className="text-[15px] text-t2 max-w-[340px] leading-[1.6] mx-auto">
+              <p style={{ fontSize: 15, color: 'var(--t2)', maxWidth: 340, lineHeight: 1.6, margin: '0 auto' }}>
                 Every node is a college. Every line is a conversation. Upgrade to unlock more connections. 🌍
               </p>
             </div>
 
             {/* Floating stat cards */}
-            <div className="flex flex-col gap-2.5 w-full max-w-[280px] pointer-events-auto">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, pointerEvents: 'auto' }}>
               {[
                 { label: 'Your College', value: user.college || 'Verified', border: 'var(--accent)', bg: 'var(--accent-glow)' },
                 { label: 'Conversations', value: `${user.callCount || 0} total`, border: 'var(--green)', bg: 'var(--green-sub)' },
@@ -171,13 +218,13 @@ export default function AccountPage() {
               ].map((s, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 rounded-lg px-5 py-3.5 backdrop-blur-xl shadow-md"
-                  style={{ background: s.bg, border: `1px solid ${s.border}`, animation: `float 4s ease-in-out ${i * 1.3}s infinite` }}
+                  className="acc-float-stat"
+                  style={{ animationDelay: `${i * 1.3}s`, background: s.bg, border: `1px solid ${s.border}` }}
                 >
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.border, boxShadow: `0 0 8px ${s.border}` }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.border, boxShadow: `0 0 8px ${s.border}`, flexShrink: 0 }} />
                   <div>
-                    <div className="text-[12px] text-t3 font-semibold">{s.label}</div>
-                    <div className="text-[15px] text-t1 font-black">{s.value}</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ fontSize: 15, color: 'var(--t1)', fontWeight: 900 }}>{s.value}</div>
                   </div>
                 </div>
               ))}
@@ -193,14 +240,6 @@ export default function AccountPage() {
           onTierChange={t => { setTier(t); setShowUp(false) }}
         />
       )}
-    </div>
-  )
-}
-
-function Card({ children }) {
-  return (
-    <div className="bg-surf border border-bdr rounded-xl p-[22px] flex flex-col gap-3 shadow-sm transition-all hover:border-bdr-s">
-      {children}
     </div>
   )
 }
@@ -316,5 +355,5 @@ function AccountCanvas() {
     }
   }, [])
 
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
 }

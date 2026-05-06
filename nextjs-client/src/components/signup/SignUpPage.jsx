@@ -5,16 +5,17 @@ import ThemeToggle from '@/components/ThemeToggle'
 
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
-function Spinner({ size = 18 }) {
+function Spinner({ size = 18, white = false }) {
   return (
     <div
       style={{
         width: size, height: size,
-        border: '2.5px solid var(--border)',
-        borderTopColor: 'var(--accent)',
+        border: `2.5px solid ${white ? 'rgba(255,255,255,0.3)' : 'var(--border)'}`,
+        borderTopColor: white ? '#fff' : 'var(--accent)',
         borderRadius: '50%',
         animation: 'spinAnim .75s linear infinite',
         flexShrink: 0,
+        display: 'inline-block',
       }}
     />
   )
@@ -29,7 +30,6 @@ export default function SignUpPage() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Check if already logged in
   useEffect(() => {
     const token = localStorage.getItem('ub_token')
     if (token) {
@@ -59,11 +59,8 @@ export default function SignUpPage() {
         localStorage.setItem('ub_token', data.token)
         localStorage.setItem('ub_username', data.username || 'Guest')
         localStorage.setItem('ub_guest', '1')
-        const deviceId = data.deviceId || Math.random().toString(36).slice(2)
-        localStorage.setItem('ub_device_id', deviceId)
         router.push('/chat')
       } else {
-        // Guest limit reached
         setErr(data.error || 'Guest limit reached. Please sign up.')
       }
     } catch {
@@ -80,33 +77,24 @@ export default function SignUpPage() {
   ]
 
   return (
-    <div className="absolute inset-0 flex items-stretch overflow-hidden">
+    <div className="screen-signup">
       {/* ── LEFT HERO ── */}
-      <div className="flex-1 flex flex-col justify-end p-[52px_56px] relative overflow-hidden">
-        <p className="text-[11px] font-bold tracking-[2.5px] uppercase text-accent mb-5 flex items-center gap-2.5">
-          <span className="w-7 h-0.5 bg-accent rounded-sm shrink-0" />
+      <div className="signup-hero">
+        <p className="hero-eyebrow">
+          <span style={{ width: 28, height: 2, background: 'var(--accent)', borderRadius: 2, flexShrink: 0 }} />
           Real conversations
         </p>
-        <h1
-          className="font-display font-black text-t1 leading-[1.05] tracking-[-2px] mb-6"
-          style={{ fontSize: 'clamp(42px, 5vw, 72px)' }}
-        >
+        <h1 className="hero-title">
           Connect with<br />
-          <em
-            style={{
-              fontStyle: 'normal',
-              color: 'transparent',
-              WebkitTextStroke: '2px var(--accent)',
-            }}
-          >strangers</em><br />
+          <em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '2px var(--accent)' }}>strangers</em><br />
           who get it.
         </h1>
-        <p className="text-[17px] text-t2 leading-[1.7] max-w-[440px] mb-9">
-          UniBuddy matches you with students from your college and beyond for real video conversations that actually go somewhere.
+        <p className="hero-desc">
+          UniBuddy matches you with students from your college and beyond for real voice conversations that actually go somewhere.
         </p>
 
         {/* Stats pills */}
-        <div className="flex gap-3.5 flex-wrap">
+        <div className="hero-stats">
           {[
             { dot: true, text: '1,200+ students online' },
             { text: '🎓 College-verified only' },
@@ -114,39 +102,35 @@ export default function SignUpPage() {
           ].map((s, i) => (
             <div
               key={i}
-              className="flex items-center gap-2.5 bg-glass border border-glass-b backdrop-blur-xl rounded-2xl px-[18px] py-2.5 text-[13px] font-semibold"
-              style={{ animation: `float 4s ease-in-out ${i * 0.8}s infinite` }}
+              className="hero-stat"
+              style={{ animationDelay: `${i * 0.8}s` }}
             >
-              {s.dot && (
-                <span
-                  className="w-2 h-2 rounded-full bg-green shrink-0"
-                  style={{ animation: 'pulseDot 2s ease infinite' }}
-                />
-              )}
+              {s.dot && <span className="online-dot" />}
               {s.text}
             </div>
           ))}
         </div>
 
         {/* Floating college cards */}
-        <div
-          className="absolute top-10 right-[-20px] flex flex-col gap-3.5 pointer-events-none"
-          style={{ transform: 'perspective(600px) rotateY(-12deg) rotateX(4deg)' }}
-        >
+        <div className="hero-cards">
           {CARDS.map((c, i) => (
-            <div
-              key={i}
-              className="bg-glass border border-glass-b backdrop-blur-2xl rounded-lg p-[16px_20px] flex items-center gap-3.5 w-[220px] shadow-md"
-            >
+            <div key={i} className="hero-card">
               <div
-                className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-white font-black shrink-0"
-                style={{ background: c.color, fontSize: 10, letterSpacing: '-0.5px' }}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: c.color, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 900, fontSize: 10,
+                  letterSpacing: '-0.5px', flexShrink: 0,
+                }}
               >
                 {c.letter}
               </div>
-              <div className="flex-1 overflow-hidden">
-                <div className="text-[13px] font-bold text-t1 truncate">{c.college}</div>
-                <div className="text-[11px] text-t3 mt-0.5">Student connected 🟢</div>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.college}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>Student connected 🟢</div>
               </div>
             </div>
           ))}
@@ -154,25 +138,21 @@ export default function SignUpPage() {
       </div>
 
       {/* ── RIGHT FORM PANEL ── */}
-      <div
-        className="w-[440px] shrink-0 bg-surf border-l border-bdr flex flex-col justify-center px-11 py-12 overflow-y-auto relative"
-      >
-        <div className="absolute top-5 right-5">
+      <div className="signup-form-panel">
+        <div style={{ position: 'absolute', top: 20, right: 20 }}>
           <ThemeToggle />
         </div>
 
         {/* Logo */}
-        <div className="font-display text-[22px] font-black text-accent flex items-center gap-2.5 mb-8 tracking-[-0.5px]">
-          <div className="w-[34px] h-[34px] bg-accent rounded-[10px] flex items-center justify-center text-white text-base font-black font-body shrink-0">
-            U
-          </div>
+        <div className="form-logo">
+          <div className="form-logo-mark">U</div>
           UniBuddy
         </div>
 
-        <h2 className="font-display text-[26px] font-bold text-t1 mb-1.5 tracking-[-0.5px]">
+        <h2 className="form-heading">
           {step === 'otp' ? '📬 Check your inbox' : step === 'new' ? '👋 Create account' : '👋 Welcome back'}
         </h2>
-        <p className="text-[14px] text-t3 mb-7 leading-[1.6]">
+        <p className="form-sub">
           {step === 'otp'
             ? `We sent a 6-digit code to ${pendingEmail}`
             : step === 'new'
@@ -180,18 +160,14 @@ export default function SignUpPage() {
             : 'Log in with your college email'}
         </p>
 
-        {/* Tabs */}
+        {/* Auth Tabs */}
         {step !== 'otp' && (
-          <div className="flex bg-elev rounded-sm p-[3px] gap-[3px] mb-6">
+          <div className="auth-tabs">
             {['new', 'returning'].map(s => (
               <button
                 key={s}
                 onClick={() => { setStep(s); setErr('') }}
-                className={`flex-1 py-[9px] rounded-[calc(var(--r-sm)-1px)] text-[14px] font-semibold transition-all ${
-                  step === s
-                    ? 'bg-surf text-t1 shadow-sm'
-                    : 'text-t3 hover:text-t2'
-                }`}
+                className={`auth-tab${step === s ? ' active' : ''}`}
               >
                 {s === 'new' ? '✨ Sign Up' : '🔑 Log In'}
               </button>
@@ -205,28 +181,30 @@ export default function SignUpPage() {
 
         {step !== 'otp' && (
           <>
-            <div className="flex items-center gap-3 text-t4 text-[12px] my-4">
-              <span className="flex-1 h-px bg-bdr" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--t4)', fontSize: 12, margin: '16px 0' }}>
+              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               or
-              <span className="flex-1 h-px bg-bdr" />
+              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
             <button
               onClick={handleGuest}
               disabled={loading}
-              className="w-full py-[13px] px-5 rounded-md text-[14px] font-semibold text-t2 border border-bdr flex items-center justify-content-center gap-2 disabled:opacity-50 transition-all hover:border-accent hover:text-t1 hover:bg-accent-glow"
-              style={{ transition: 'all 120ms cubic-bezier(.4,0,.2,1)', justifyContent: 'center' }}
+              className="btn-ghost"
             >
               {loading ? <Spinner size={16} /> : '🚀 Try as Guest — 1 free call'}
             </button>
-            <p className="text-[12px] text-t4 text-center mt-2">No email needed. Jump right in.</p>
+            <p style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', marginTop: 8 }}>No email needed. Jump right in.</p>
           </>
         )}
 
-        {err && <p className="text-red text-[13px] text-center mt-3 animate-shake">{err}</p>}
+        {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', marginTop: 12, animation: 'shake 300ms ease' }}>{err}</p>}
 
-        <p className="mt-5 text-center text-[13px] text-t3">
+        <p style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: 'var(--t3)' }}>
           Want community chat?{' '}
-          <a href="/community" className="text-accent font-bold px-1.5 py-0.5 rounded-xs transition-all hover:bg-accent-glow">
+          <a
+            href="/community"
+            style={{ color: 'var(--accent)', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--r-xs)', transition: 'all var(--t-fast)' }}
+          >
             Community 💬
           </a>
         </p>
@@ -260,20 +238,21 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 w-full">
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <input
-        className={`w-full px-4 py-[14px] text-[15px] bg-elev border-[1.5px] rounded-md text-t1 outline-none transition-all placeholder:text-t4 focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)] ${err ? 'border-red animate-shake' : 'border-bdr'}`}
+        className={`ub-input no-ico${err ? ' err' : ''}`}
         type="text" placeholder="👤 What should we call you?" value={name}
         onChange={e => { setName(e.target.value); setErr('') }}
         autoFocus maxLength={24}
+        style={err ? { animation: 'shake 300ms ease' } : {}}
       />
       <input
-        className="w-full px-4 py-[14px] text-[15px] bg-elev border-[1.5px] border-bdr rounded-md text-t1 outline-none transition-all placeholder:text-t4 focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]"
+        className="ub-input no-ico"
         type="email" placeholder="🎓 College email (you@iitb.ac.in)" value={email}
         onChange={e => { setEmail(e.target.value); setErr('') }}
         maxLength={80}
       />
-      {err && <p className="text-red text-[13px] text-center animate-shake">{err}</p>}
+      {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>📨 Send Verification Code →</PrimaryBtn>
     </form>
   )
@@ -302,16 +281,16 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 w-full">
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <input
-        className="w-full px-4 py-[14px] text-[15px] bg-elev border-[1.5px] border-bdr rounded-md text-t1 outline-none transition-all placeholder:text-t4 focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]"
+        className="ub-input no-ico"
         type="email" placeholder="🎓 Your college email" value={email}
         onChange={e => { setEmail(e.target.value); setErr('') }}
         autoFocus
       />
-      {err && <p className="text-red text-[13px] text-center">{err}</p>}
+      {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center' }}>{err}</p>}
       <PrimaryBtn loading={loading}>🔑 Send Login Code →</PrimaryBtn>
-      <button type="button" onClick={onSwitch} className="text-[13px] text-accent py-1">
+      <button type="button" onClick={onSwitch} style={{ fontSize: 13, color: 'var(--accent)', padding: '4px 0', cursor: 'pointer', background: 'none', border: 'none' }}>
         Not registered? Sign up →
       </button>
     </form>
@@ -375,41 +354,40 @@ function StepOtp({ email, name, isRet, onVerified, onBack }) {
   }
 
   return (
-    <form onSubmit={verify} className="flex flex-col gap-3.5 w-full items-center">
+    <form onSubmit={verify} style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', alignItems: 'center' }}>
       {isRet && name && (
-        <p className="text-[14px] text-t2 text-center">
-          Welcome back, <strong className="text-t1">{name}</strong> 👋
+        <p style={{ fontSize: 14, color: 'var(--t2)', textAlign: 'center' }}>
+          Welcome back, <strong style={{ color: 'var(--t1)' }}>{name}</strong> 👋
         </p>
       )}
-      <p className="text-[14px] text-t2 text-center leading-[1.6]">
-        Code sent to <strong className="text-t1">{email}</strong>
+      <p style={{ fontSize: 14, color: 'var(--t2)', textAlign: 'center', lineHeight: 1.6 }}>
+        Code sent to <strong style={{ color: 'var(--t1)' }}>{email}</strong>
       </p>
-      <div className="flex gap-2 justify-center" onPaste={paste}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }} onPaste={paste}>
         {otp.map((d, i) => (
           <input
             key={i}
             ref={el => refs.current[i] = el}
-            className="w-12 h-14 bg-elev border-[1.5px] rounded-md text-t1 text-[22px] font-bold text-center outline-none transition-all [caret-color:var(--accent)] focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)] [&:not(:placeholder-shown)]:text-accent [&:not(:placeholder-shown)]:border-accent"
-            style={{ borderColor: d ? 'var(--accent)' : undefined, color: d ? 'var(--accent)' : undefined }}
+            className={`otp-box${d ? ' filled' : ''}`}
             type="text" inputMode="numeric" maxLength={1} placeholder="·"
             value={d} onChange={ev => digit(i, ev.target.value)} onKeyDown={ev => keydown(i, ev)}
             autoFocus={i === 0}
           />
         ))}
       </div>
-      {err && <p className="text-red text-[13px] text-center animate-shake">{err}</p>}
+      {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>
         {isRet ? '✅ Verify & Log In →' : '🚀 Verify & Start Talking →'}
       </PrimaryBtn>
-      <div className="flex justify-between items-center w-full">
-        <button type="button" onClick={onBack} className="text-[13px] text-t3 px-1.5 py-1 rounded-xs hover:text-t2 transition-colors">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+        <button type="button" onClick={onBack} style={{ fontSize: 13, color: 'var(--t3)', cursor: 'pointer', background: 'none', border: 'none', padding: '4px 6px', borderRadius: 'var(--r-xs)', transition: 'color var(--t-fast)' }}>
           ← Change email
         </button>
         <button
           type="button"
           disabled={cd > 0}
           onClick={resend}
-          className="text-[13px] text-accent px-1.5 py-1 rounded-xs disabled:opacity-40 hover:text-accent-h transition-colors"
+          style={{ fontSize: 13, color: 'var(--accent)', cursor: cd > 0 ? 'not-allowed' : 'pointer', opacity: cd > 0 ? 0.4 : 1, background: 'none', border: 'none', padding: '4px 6px', borderRadius: 'var(--r-xs)', transition: 'all var(--t-fast)' }}
         >
           {cd > 0 ? `Resend in ${cd}s ⏳` : '📨 Resend code'}
         </button>
@@ -425,22 +403,9 @@ function PrimaryBtn({ children, loading, onClick, disabled }) {
       type={onClick ? 'button' : 'submit'}
       onClick={onClick}
       disabled={loading || disabled}
-      className="w-full py-[15px] px-6 bg-accent text-white rounded-md text-[15px] font-bold flex items-center justify-center gap-2 relative overflow-hidden transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_28px_var(--accent-glow)] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
-      style={{ transition: 'all 220ms cubic-bezier(.4,0,.2,1)' }}
+      className="btn-primary"
     >
-      <span className="absolute inset-0 pointer-events-none bg-[linear-gradient(135deg,oklch(100%_0_0/0.12),transparent_60%)]" />
-      {loading ? (
-        <span
-          style={{
-            width: 16, height: 16,
-            border: '2.5px solid rgba(255,255,255,0.3)',
-            borderTopColor: '#fff',
-            borderRadius: '50%',
-            animation: 'spinAnim .75s linear infinite',
-            display: 'inline-block',
-          }}
-        />
-      ) : children}
+      {loading ? <Spinner size={16} white /> : children}
     </button>
   )
 }

@@ -78,16 +78,11 @@ export default function LocalVideo({
   }
 
   return (
-    <div
-      className="flex-1 rounded-lg border border-bdr overflow-hidden relative min-h-[160px] shadow-sm transition-all hover:border-accent"
-      style={{ background: 'linear-gradient(135deg,var(--bg-surf),var(--bg-elev))', boxShadow: 'var(--sh-sm)' }}
-    >
+    <div className="video-slot">
       {/* Placeholder when no video */}
       {!videoEnabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-t4 text-[13px]">
-          <div className="w-[60px] h-[60px] rounded-full bg-accent-glow border-2 border-accent flex items-center justify-center text-[26px]">
-            🎙️
-          </div>
+        <div className="video-ph">
+          <div className="video-ph-ico">🎙️</div>
           <span>You — audio only</span>
         </div>
       )}
@@ -95,26 +90,26 @@ export default function LocalVideo({
       <video
         ref={localVideoRef}
         autoPlay playsInline muted
-        className="w-full h-full object-cover"
         onClick={() => setChangeCamOverlay(true)}
-        style={{ display: videoEnabled ? 'block' : 'none', cursor: 'pointer' }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: videoEnabled ? 'block' : 'none', cursor: 'pointer' }}
       />
 
       {/* Label */}
-      <span
-        className="absolute bottom-2.5 left-2.5 text-white text-[11px] font-bold px-3 py-1 rounded-2xl"
-        style={{ background: 'oklch(0% 0 0/.72)', backdropFilter: 'blur(8px)' }}
-      >
-        🎙️ You
-      </span>
+      <span className="video-lbl">🎙️ You</span>
 
       {/* Partner-has-video hint */}
       {partnerVideoOn && !videoEnabled && (
-        <div
-          className="absolute top-2 left-0 right-0 mx-auto w-fit text-[11px] font-bold px-3 py-1 rounded-2xl text-white"
-          style={{ background: 'oklch(0% 0 0/.72)' }}
-        >
-          📷 Partner is on video
+        <div style={{
+          position: 'absolute', top: 8, left: 0, right: 0,
+          display: 'flex', justifyContent: 'center',
+        }}>
+          <span style={{
+            background: 'oklch(0% 0 0/.72)', backdropFilter: 'blur(8px)',
+            borderRadius: 'var(--r-full)', padding: '4px 12px',
+            fontSize: 11, fontWeight: 700, color: '#fff',
+          }}>
+            📷 Partner is on video
+          </span>
         </div>
       )}
 
@@ -122,12 +117,18 @@ export default function LocalVideo({
       <button
         onClick={toggleVideo}
         disabled={!strangerUserId || videoLoading}
-        className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 px-4 py-[6px] text-[12px] font-semibold rounded-2xl border transition-all whitespace-nowrap z-10 backdrop-blur-[10px] ${
-          videoEnabled
-            ? 'bg-accent-glow border-accent text-accent'
-            : 'text-t2 border-bdr hover:border-accent hover:text-t1'
-        } disabled:opacity-40 disabled:cursor-not-allowed`}
-        style={{ background: videoEnabled ? undefined : 'oklch(0% 0 0/.72)' }}
+        style={{
+          position: 'absolute', bottom: 10,
+          left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 16px', fontSize: 12, fontWeight: 600,
+          borderRadius: 'var(--r-full)', border: '1px solid',
+          transition: 'all var(--t-fast)', whiteSpace: 'nowrap',
+          zIndex: 10, backdropFilter: 'blur(10px)', cursor: 'pointer',
+          background: videoEnabled ? 'var(--accent-glow)' : 'oklch(0% 0 0/.72)',
+          borderColor: videoEnabled ? 'var(--accent)' : 'var(--border)',
+          color: videoEnabled ? 'var(--accent)' : 'var(--t2)',
+          opacity: (!strangerUserId || videoLoading) ? 0.4 : 1,
+        }}
       >
         {videoLoading ? '⏳' : videoEnabled ? '📷 Camera On' : '📷 Enable Video'}
       </button>

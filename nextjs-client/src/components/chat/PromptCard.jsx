@@ -2,38 +2,47 @@
 
 export default function PromptCard({ prompt, onNext, onClose }) {
   return (
-    <div
-      className="mx-2.5 mt-2.5 shrink-0 rounded-md p-[12px_14px] border animate-slide-down"
-      style={{
-        background: 'linear-gradient(135deg,var(--accent-glow),oklch(64% 0.09 280 / 0.4))',
-        borderColor: 'oklch(64% 0.22 280 / 0.35)',
-      }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-[11px] font-bold px-2.5 py-[3px] rounded-2xl tracking-[0.3px] text-white"
-          style={{ background: 'var(--accent)' }}
-        >
+    <div className="prompt-card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: '3px 10px',
+          borderRadius: 'var(--r-full)', letterSpacing: '0.3px',
+          color: '#fff', background: 'var(--accent)',
+        }}>
           💭 {prompt.cat || 'Prompt'}
         </span>
-        <div className="flex gap-0.5">
+        <div style={{ display: 'flex', gap: 2 }}>
           <button
             onClick={onNext}
-            className="w-7 h-7 rounded-xs flex items-center justify-center text-t3 text-[13px] transition-all hover:bg-elev hover:text-t2"
             title="Next prompt"
+            style={{
+              width: 28, height: 28, borderRadius: 'var(--r-xs)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, color: 'var(--t3)', background: 'none', border: 'none',
+              cursor: 'pointer', transition: 'all var(--t-fast)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elev)'; e.currentTarget.style.color = 'var(--t2)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '' }}
           >
             🔀
           </button>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-xs flex items-center justify-center text-t3 text-[13px] transition-all hover:bg-elev hover:text-red"
             title="Dismiss"
+            style={{
+              width: 28, height: 28, borderRadius: 'var(--r-xs)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, color: 'var(--t3)', background: 'none', border: 'none',
+              cursor: 'pointer', transition: 'all var(--t-fast)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elev)'; e.currentTarget.style.color = 'var(--red)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '' }}
           >
             ✕
           </button>
         </div>
       </div>
-      <p className="text-[14px] font-medium text-t1 leading-[1.6] italic">
+      <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--t1)', lineHeight: 1.6, fontStyle: 'italic' }}>
         "{prompt.text}"
       </p>
     </div>

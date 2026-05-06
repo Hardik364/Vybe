@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
 export default function PostCallScreen({ strangerUsername, strangerUserId, socket, onConnect, onMoveOn }) {
-  const [myPressed,    setMyPressed]    = useState(false)
-  const [theyPressed,  setTheyPressed]  = useState(false)
-  const [timer,        setTimer]        = useState(30)
-  const [contactTab,   setContactTab]   = useState('whatsapp')
-  const [contactVal,   setContactVal]   = useState('')
-  const [exchanged,    setExchanged]    = useState(null)
+  const [myPressed,   setMyPressed]   = useState(false)
+  const [theyPressed, setTheyPressed] = useState(false)
+  const [timer,       setTimer]       = useState(30)
+  const [contactTab,  setContactTab]  = useState('whatsapp')
+  const [contactVal,  setContactVal]  = useState('')
+  const [exchanged,   setExchanged]   = useState(null)
 
   // Countdown
   useEffect(() => {
@@ -32,110 +32,139 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
     socket.emit('connectRequest', { to: strangerUserId, contact: { type: contactTab, value: contactVal } })
   }
 
+  // ── Success state ──
   if (exchanged) {
     return (
-      <Overlay>
-        <div className="text-[40px] mb-1">🤝</div>
-        <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-t4">You connected!</p>
-        <h2 className="font-display text-[24px] font-bold text-t1">Exchange successful</h2>
-        <div className="flex gap-2 flex-wrap justify-center">
-          {exchanged.whatsapp && (
-            <a
-              href={`https://wa.me/${exchanged.whatsapp}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-7 py-3 bg-accent-glow border border-accent rounded-md text-accent text-[16px] font-bold transition-all hover:bg-[oklch(64%_0.22_280/0.28)]"
-            >
-              📱 WhatsApp
-            </a>
-          )}
-          {exchanged.instagram && (
-            <a
-              href={`https://instagram.com/${exchanged.instagram}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-7 py-3 bg-accent-glow border border-accent rounded-md text-accent text-[16px] font-bold transition-all hover:bg-[oklch(64%_0.22_280/0.28)]"
-            >
-              📷 Instagram
-            </a>
-          )}
+      <div className="overlay">
+        <div className="modal-card">
+          <div style={{ fontSize: 40, marginBottom: 4 }}>🤝</div>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--t4)' }}>
+            You connected!
+          </p>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--t1)' }}>
+            Exchange successful
+          </h2>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {exchanged.whatsapp && (
+              <a
+                href={`https://wa.me/${exchanged.whatsapp}`}
+                target="_blank" rel="noreferrer"
+                style={{
+                  padding: '12px 28px', borderRadius: 'var(--r-md)',
+                  background: 'var(--accent-glow)', border: '1px solid var(--accent)',
+                  color: 'var(--accent)', fontSize: 16, fontWeight: 700,
+                  transition: 'all var(--t-fast)', textDecoration: 'none',
+                }}
+              >
+                📱 WhatsApp
+              </a>
+            )}
+            {exchanged.instagram && (
+              <a
+                href={`https://instagram.com/${exchanged.instagram}`}
+                target="_blank" rel="noreferrer"
+                style={{
+                  padding: '12px 28px', borderRadius: 'var(--r-md)',
+                  background: 'var(--accent-glow)', border: '1px solid var(--accent)',
+                  color: 'var(--accent)', fontSize: 16, fontWeight: 700,
+                  transition: 'all var(--t-fast)', textDecoration: 'none',
+                }}
+              >
+                📷 Instagram
+              </a>
+            )}
+          </div>
+          <button
+            onClick={onConnect}
+            style={{ fontSize: 13, color: 'var(--t4)', padding: '8px', cursor: 'pointer', background: 'none', border: 'none', transition: 'color var(--t-fast)' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--t3)'}
+            onMouseLeave={e => e.currentTarget.style.color = ''}
+          >
+            Continue →
+          </button>
         </div>
-        <button onClick={onConnect} className="text-[13px] text-t4 px-2 py-2 hover:text-t3 transition-colors">
-          Continue →
-        </button>
-      </Overlay>
+      </div>
     )
   }
 
   return (
-    <Overlay>
-      <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-t4">That's a wrap</p>
-      <h2 className="font-display text-[24px] font-bold text-t1 leading-[1.3]">
-        Stay in touch with {strangerUsername || 'them'}?
-      </h2>
+    <div className="overlay">
+      <div className="modal-card">
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--t4)' }}>
+          That's a wrap
+        </p>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--t1)', lineHeight: 1.3 }}>
+          Stay in touch with {strangerUsername || 'them'}?
+        </h2>
 
-      {/* Contact input */}
-      <div className="flex gap-2 bg-elev rounded-md p-1 w-full max-w-xs">
-        {['whatsapp', 'instagram'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setContactTab(tab)}
-            className={`flex-1 py-2 px-4 rounded-[calc(var(--r-md)-2px)] text-[13px] font-bold transition-all ${
-              contactTab === tab ? 'bg-surf text-t1 shadow-sm' : 'text-t3'
-            }`}
-          >
-            {tab === 'whatsapp' ? '📱 WhatsApp' : '📷 Instagram'}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center w-full max-w-xs bg-elev border border-bdr rounded-md overflow-hidden transition-all focus-within:border-accent">
-        <span className="px-3.5 py-3 text-t3 text-[13px] font-bold border-r border-bdr select-none">
-          {contactTab === 'whatsapp' ? '+91' : '@'}
-        </span>
-        <input
-          value={contactVal}
-          onChange={e => setContactVal(e.target.value)}
-          placeholder={contactTab === 'whatsapp' ? '9876543210' : 'username'}
-          className="flex-1 bg-transparent border-none outline-none text-t1 text-[14px] px-3.5 py-3 placeholder:text-t4"
-        />
-      </div>
+        {/* Contact input tabs */}
+        <div style={{ display: 'flex', gap: 8, background: 'var(--bg-elev)', borderRadius: 'var(--r-md)', padding: 4, width: '100%', maxWidth: 320 }}>
+          {['whatsapp', 'instagram'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setContactTab(tab)}
+              style={{
+                flex: 1, padding: '8px 16px',
+                borderRadius: 'calc(var(--r-md) - 2px)',
+                fontSize: 13, fontWeight: 700,
+                background: contactTab === tab ? 'var(--bg-surf)' : 'none',
+                color: contactTab === tab ? 'var(--t1)' : 'var(--t3)',
+                boxShadow: contactTab === tab ? 'var(--sh-sm)' : 'none',
+                border: 'none', cursor: 'pointer', transition: 'all var(--t-fast)',
+              }}
+            >
+              {tab === 'whatsapp' ? '📱 WhatsApp' : '📷 Instagram'}
+            </button>
+          ))}
+        </div>
 
-      <div className="flex gap-3 w-full">
-        <button
-          onClick={handleConnect}
-          disabled={myPressed}
-          className={`flex-1 rounded-lg py-[18px] px-4 text-[15px] font-bold flex flex-col items-center gap-1 transition-all border-none text-white ${
-            myPressed
-              ? 'bg-elev text-t3 cursor-default'
-              : 'bg-green hover:translate-y-[-2px] hover:shadow-[0_8px_28px_var(--green-glow)]'
-          }`}
+        <div style={{
+          display: 'flex', alignItems: 'center', width: '100%', maxWidth: 320,
+          background: 'var(--bg-elev)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)', overflow: 'hidden', transition: 'border-color var(--t-fast)',
+        }}
+          onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+          onBlur={e => e.currentTarget.style.borderColor = ''}
         >
-          <span>🤝 Connect</span>
-          <span className="text-[12px] font-normal opacity-75">
-            {myPressed ? (theyPressed ? 'Both connected! 🎉' : 'Waiting for them…') : `${timer}s`}
+          <span style={{
+            padding: '12px 14px', fontSize: 13, fontWeight: 700,
+            color: 'var(--t3)', borderRight: '1px solid var(--border)', userSelect: 'none',
+          }}>
+            {contactTab === 'whatsapp' ? '+91' : '@'}
           </span>
-        </button>
-        <button
-          onClick={onMoveOn}
-          className="flex-1 rounded-lg py-[18px] px-4 text-[15px] font-semibold flex flex-col items-center gap-1 transition-all bg-transparent border border-bdr text-t2 hover:border-red hover:text-red hover:bg-red-sub"
-        >
-          <span>👋 Move On</span>
-          <span className="text-[12px] font-normal opacity-60">Gone forever</span>
-        </button>
-      </div>
+          <input
+            value={contactVal}
+            onChange={e => setContactVal(e.target.value)}
+            placeholder={contactTab === 'whatsapp' ? '9876543210' : 'username'}
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              color: 'var(--t1)', fontSize: 14, padding: '12px 14px',
+              fontFamily: 'var(--font-body)',
+            }}
+          />
+        </div>
 
-      <p className="text-[12px] text-t4 max-w-[300px] leading-[1.6] text-center">
-        💛 Both must press Connect within {timer}s. Contact info is only shared on mutual agreement.
-      </p>
-    </Overlay>
-  )
-}
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+          <button
+            onClick={handleConnect}
+            disabled={myPressed}
+            className="btn-connect"
+          >
+            <span>🤝 Connect</span>
+            <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.75 }}>
+              {myPressed ? (theyPressed ? 'Both connected! 🎉' : 'Waiting for them…') : `${timer}s`}
+            </span>
+          </button>
+          <button onClick={onMoveOn} className="btn-moveon">
+            <span>👋 Move On</span>
+            <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.6 }}>Gone forever</span>
+          </button>
+        </div>
 
-function Overlay({ children }) {
-  return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center px-5 animate-fade-in" style={{ background: 'var(--bg-over)', backdropFilter: 'blur(12px)' }}>
-      <div className="bg-surf border border-bdr rounded-xl p-10 w-full max-w-[480px] text-center flex flex-col items-center gap-3.5 shadow-lg animate-pop-in">
-        {children}
+        <p style={{ fontSize: 12, color: 'var(--t4)', maxWidth: 300, lineHeight: 1.6, textAlign: 'center' }}>
+          💛 Both must press Connect within {timer}s. Contact info is only shared on mutual agreement.
+        </p>
       </div>
     </div>
   )

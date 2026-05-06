@@ -11,8 +11,6 @@ const TIERS = [
     scope: 'Your college only',
     color: 'oklch(55% 0.01 265)',
     features: ['Match with your own college', 'Voice + optional video', 'Conversation prompts', 'Community chat'],
-    cta: 'Current Plan',
-    ctaClass: 'active',
   },
   {
     id: 'plus',
@@ -48,7 +46,7 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
 
   if (selectedPlan) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-fade-in" style={{ background: 'var(--bg-over)', backdropFilter: 'blur(12px)' }}>
+      <div className="up-overlay">
         <CheckoutModal
           selectedPlan={selectedPlan}
           onSuccess={tier => { onTierChange(tier); setSelectedPlan(null) }}
@@ -59,24 +57,39 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-fade-in" style={{ background: 'var(--bg-over)', backdropFilter: 'blur(12px)' }}>
-      <div className="bg-surf border border-bdr rounded-xl p-9 w-full max-w-[840px] max-h-[90vh] overflow-y-auto shadow-lg animate-pop-in relative">
+    <div className="up-overlay">
+      <div className="up-modal">
         {/* Header */}
-        <div className="text-center mb-7 relative">
-          <button onClick={onClose} className="absolute top-[-4px] right-[-4px] w-8 h-8 rounded-2xl flex items-center justify-center text-t3 text-[15px] transition-all hover:bg-elev hover:text-t1">✕</button>
-          <h2 className="font-display text-[28px] font-black text-t1 mb-1.5">⚡ Upgrade UniBuddy</h2>
-          <p className="text-[14px] text-t3">Unlock more conversations. Connect further.</p>
+        <div style={{ textAlign: 'center', marginBottom: 28, position: 'relative' }}>
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute', top: -4, right: -4,
+              width: 32, height: 32, borderRadius: 'var(--r-full)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--t3)', fontSize: 15, background: 'none', border: 'none',
+              cursor: 'pointer', transition: 'all var(--t-fast)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elev)'; e.currentTarget.style.color = 'var(--t1)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '' }}
+          >
+            ✕
+          </button>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>
+            ⚡ Upgrade UniBuddy
+          </h2>
+          <p style={{ fontSize: 14, color: 'var(--t3)' }}>Unlock more conversations. Connect further.</p>
         </div>
 
         {/* Tier cards */}
-        <div className="grid grid-cols-3 gap-4 mb-6" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+        <div className="up-tiers">
           {TIERS.map(tier => {
             const isCurr = currentTier === tier.id
             const isFeat = tier.id === 'plus'
             return (
               <div
                 key={tier.id}
-                className="relative bg-elev rounded-lg p-6 flex flex-col gap-2.5 transition-all hover:translate-y-[-2px]"
+                className="tier-card"
                 style={{
                   border: isCurr
                     ? '1.5px solid var(--green)'
@@ -88,26 +101,39 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
               >
                 {/* Badge */}
                 {tier.badge && (
-                  <span className="absolute top-[-13px] left-1/2 -translate-x-1/2 text-[11px] font-black px-3 py-[3px] rounded-2xl bg-accent text-white whitespace-nowrap">
+                  <span style={{
+                    position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)',
+                    fontSize: 11, fontWeight: 900, padding: '3px 12px',
+                    borderRadius: 'var(--r-full)', background: 'var(--accent)',
+                    color: '#fff', whiteSpace: 'nowrap',
+                  }}>
                     {tier.badge}
                   </span>
                 )}
                 {isCurr && (
-                  <span className="absolute top-[-13px] left-1/2 -translate-x-1/2 text-[11px] font-black px-3 py-[3px] rounded-2xl bg-green text-white whitespace-nowrap">
+                  <span style={{
+                    position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)',
+                    fontSize: 11, fontWeight: 900, padding: '3px 12px',
+                    borderRadius: 'var(--r-full)', background: 'var(--green)',
+                    color: '#fff', whiteSpace: 'nowrap',
+                  }}>
                     ✓ Current
                   </span>
                 )}
 
-                <h3 className="font-display text-[18px] font-black" style={{ color: tier.color }}>{tier.name}</h3>
-                <p className="text-[13px] text-t3 font-medium">{tier.scope}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-display text-[32px] font-black text-t1">{tier.price}</span>
-                  <span className="text-[13px] text-t3">{tier.per}</span>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 900, color: tier.color }}>
+                  {tier.name}
+                </h3>
+                <p style={{ fontSize: 13, color: 'var(--t3)', fontWeight: 500 }}>{tier.scope}</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 900, color: 'var(--t1)' }}>{tier.price}</span>
+                  <span style={{ fontSize: 13, color: 'var(--t3)' }}>{tier.per}</span>
                 </div>
-                <ul className="flex flex-col gap-[7px] flex-1">
+
+                <ul style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1, listStyle: 'none' }}>
                   {tier.features.map((f, i) => (
-                    <li key={i} className="text-[13px] text-t2 flex items-start gap-[7px]">
-                      <span className="font-black shrink-0 text-green">✓</span>
+                    <li key={i} style={{ fontSize: 13, color: 'var(--t2)', display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                      <span style={{ color: 'var(--green)', fontWeight: 900, flexShrink: 0 }}>✓</span>
                       {f}
                     </li>
                   ))}
@@ -117,27 +143,42 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
                 {isCurr ? (
                   <button
                     disabled
-                    className="mt-1.5 w-full py-[11px] rounded-md text-[14px] font-bold border-none cursor-default"
-                    style={{ background: 'var(--green-sub)', color: 'var(--green)' }}
+                    style={{
+                      marginTop: 6, width: '100%', padding: '11px 0',
+                      borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 700,
+                      border: 'none', cursor: 'default',
+                      background: 'var(--green-sub)', color: 'var(--green)',
+                    }}
                   >
                     ✓ Active Plan
                   </button>
                 ) : tier.id === 'free' ? (
                   <button
                     disabled
-                    className="mt-1.5 w-full py-[11px] rounded-md text-[14px] font-bold border-none cursor-default"
-                    style={{ background: 'var(--bg-float)', color: 'var(--t3)' }}
+                    style={{
+                      marginTop: 6, width: '100%', padding: '11px 0',
+                      borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 700,
+                      border: 'none', cursor: 'default',
+                      background: 'var(--bg-float)', color: 'var(--t3)',
+                    }}
                   >
                     Free Forever
                   </button>
                 ) : (
-                  <div className="flex flex-col gap-1.5 mt-1.5">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                     {tier.plans.map(plan => (
                       <button
                         key={plan.id}
                         onClick={() => setSelectedPlan(plan.id)}
-                        className="w-full py-[9px] rounded-sm text-[13px] font-bold border border-bdr text-t2 bg-float transition-all hover:translate-y-[-1px] hover:shadow-sm"
-                        style={{ background: 'var(--bg-float)' }}
+                        style={{
+                          width: '100%', padding: '9px 0',
+                          borderRadius: 'var(--r-sm)', fontSize: 13, fontWeight: 700,
+                          border: '1px solid var(--border)', color: 'var(--t2)',
+                          background: 'var(--bg-float)', cursor: 'pointer',
+                          transition: 'all var(--t-fast)',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--sh-sm)' }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
                       >
                         {plan.label}
                       </button>
@@ -149,7 +190,7 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
           })}
         </div>
 
-        <p className="text-center text-[13px] text-t4 pt-4 border-t border-bdr">
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--t4)', paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           🔒 Secured by Razorpay · UPI, Cards, NetBanking accepted · Cancel anytime
         </p>
       </div>

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import client from './redisClient.js'
 import { sendOtpEmail } from './utils/emailService.js'
+import { upsertUser, setAbcStatus, setUserTier } from './db.js'
 
 const router = Router()
 
@@ -136,6 +137,10 @@ router.post('/verify-otp', async (req, res) => {
             // First time this email has verified — lock in the username
             await client.set(`user:username:${emailLower}`, username)
         }
+
+        // ── Persist to Supabase (non-blocking — don't fail auth if DB is down) ──
+        upsertUser({ email: emailLower, username: finalUsername, collegeDomain })
+            .catch(err => console.error('[Auth] Supabase upsertUser failed:', err.message))
 
         // Issue JWT (valid for 7 days)
         const token = jwt.sign(

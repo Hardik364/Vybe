@@ -1,72 +1,123 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { io } from 'socket.io-client'
 import ThemeToggle from '@/components/ThemeToggle'
 
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
-const DEFAULT_CHANNELS = [
-  { id: '1', emoji: '💬', name: 'general',    description: 'General chat',          count: 24 },
-  { id: '2', emoji: '📚', name: 'study-help', description: 'Academic help',          count: 8  },
-  { id: '3', emoji: '🎮', name: 'gaming',     description: 'Gaming & fun',           count: 15 },
-  { id: '4', emoji: '💻', name: 'tech-talk',  description: 'Tech discussions',       count: 12 },
-  { id: '5', emoji: '🎵', name: 'music',      description: 'Share your playlist',    count: 6  },
-]
-
 export default function CommunityPage() {
   const router = useRouter()
-  const [channels,    setChannels]    = useState(DEFAULT_CHANNELS)
-  const [activeId,    setActiveId]    = useState('1')
+
+  const [channels,    setChannels]    = useState([])
+  const [activeId,    setActiveId]    = useState(null)
   const [messages,    setMessages]    = useState([])
   const [input,       setInput]       = useState('')
-  // Read synchronously — no 'You' flash on first render
-  const [username,    setUsername]    = useState(() =>
+  const [username]                    = useState(() =>
     typeof window !== 'undefined' ? localStorage.getItem('ub_username') || 'Student' : 'Student'
   )
   const [showCreate,  setShowCreate]  = useState(false)
   const [reportedIds, setReportedIds] = useState(new Set())
-  const socketRef = useRef(null)
-  const bottomRef = useRef(null)
+  const [loadingCh,   setLoadingCh]   = useState(true)
 
+  const socketRef  = useRef(null)
+  const bottomRef  = useRef(null)
+  const activeIdRef = useRef(null)   // always current — used inside socket callbacks
+
+  activeIdRef.current = activeId
   const activeChannel = channels.find(c => c.id === activeId)
 
+  // ── Fetch real channels from REST ────────────────────────────
+  async function loadChannels() {
+    try {
+      const res  = await fetch(`${API}/community/channels`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        setChannels(data)
+        setActiveId(prev => prev || data[0].id)
+      }
+    } catch (e) {
+      console.error('[Community] loadChannels', e)
+    } finally {
+      setLoadingCh(false)
+    }
+  }
+
+  // ── Fetch last 60 messages for a channel ────────────────────
+  async function loadHistory(channelId) {
+    try {
+      const res  = await fetch(`${API}/community/channels/${channelId}/messages`)
+      const data = await res.json()
+      setMessages(Array.isArray(data) ? data : [])
+    } catch {
+      setMessages([])
+    }
+  }
+
+  // ── Socket setup (once on mount) ────────────────────────────
   useEffect(() => {
-    const u     = localStorage.getItem('ub_username') || 'Student'
     const token = localStorage.getItem('ub_token')
-    const sock = io(API, {
+    const sock  = io(API, {
       transports: ['websocket'],
-      auth: { token: token || undefined, username: u },
+      auth: { token: token || undefined, username },
     })
     socketRef.current = sock
-    sock.on('communityMessage', msg => setMessages(p => [...p, msg]))
-    sock.on('communityHistory', hist => setMessages(hist || []))
-    sock.emit('joinChannel', activeId)
-    return () => sock.disconnect()
-  }, [])
 
+    // Real-time incoming messages
+    sock.on('channel:message', msg => {
+      if (msg.channelId === activeIdRef.current) {
+        setMessages(p => [...p, msg])
+      }
+    })
+
+    // Live member count updates
+    sock.on('channel:memberCount', ({ channelId, count }) => {
+      setChannels(p => p.map(ch =>
+        ch.id === channelId ? { ...ch, memberCount: count } : ch
+      ))
+    })
+
+    return () => sock.disconnect()
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Join/leave when active channel changes ───────────────────
   useEffect(() => {
-    if (!socketRef.current) return
-    socketRef.current.emit('joinChannel', activeId)
-    setMessages([])
-    socketRef.current.emit('getChannelHistory', activeId)
+    if (!activeId || !socketRef.current) return
+
+    socketRef.current.emit('channel:join', { channelId: activeId })
+    loadHistory(activeId)
+
+    return () => {
+      socketRef.current?.emit('channel:leave', { channelId: activeId })
+    }
   }, [activeId])
 
+  // ── Initial channel load ─────────────────────────────────────
+  useEffect(() => { loadChannels() }, [])
+
+  // ── Auto-scroll on new messages ──────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // ── Send a message ───────────────────────────────────────────
   function sendMsg(e) {
     e.preventDefault()
-    if (!input.trim() || !socketRef.current) return
-    socketRef.current.emit('communityMessage', { channelId: activeId, message: input.trim() })
-    setMessages(p => [...p, { id: Date.now(), author: username, message: input.trim(), timestamp: new Date().toISOString() }])
+    const text = input.trim()
+    if (!text || !socketRef.current || !activeId) return
+
+    socketRef.current.emit('channel:message', { channelId: activeId, content: text })
     setInput('')
   }
 
-  function report(id) {
-    setReportedIds(p => new Set([...p, id]))
-    socketRef.current?.emit('reportCommunityMessage', { messageId: id })
+  // ── Report a message ─────────────────────────────────────────
+  function report(msg) {
+    setReportedIds(p => new Set([...p, msg.id]))
+    socketRef.current?.emit('channel:report_message', {
+      channelId: activeId,
+      messageId: msg.id,
+      author:    msg.author,
+    })
   }
 
   const fmt = ts => {
@@ -75,10 +126,11 @@ export default function CommunityPage() {
   }
 
   const AVATAR_COLORS = ['#7c3aed','#059669','#d97706','#dc2626','#2563eb']
-  const av = (name) => AVATAR_COLORS[name?.charCodeAt(0) % AVATAR_COLORS.length] || AVATAR_COLORS[0]
+  const av = name => AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length]
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', background: 'var(--bg-base)' }}>
+
       {/* ── Sidebar ── */}
       <aside className="cm-side">
         <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -119,8 +171,11 @@ export default function CommunityPage() {
               +
             </button>
           </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', padding: '0 8px', gap: 2 }}>
-            {channels.map(ch => (
+            {loadingCh ? (
+              <div style={{ padding: '12px 10px', color: 'var(--t4)', fontSize: 13 }}>Loading…</div>
+            ) : channels.map(ch => (
               <button
                 key={ch.id}
                 onClick={() => setActiveId(ch.id)}
@@ -130,7 +185,7 @@ export default function CommunityPage() {
                   fontSize: 14, fontWeight: 600, textAlign: 'left', width: '100%',
                   border: 'none', cursor: 'pointer', transition: 'all var(--t-fast)',
                   background: activeId === ch.id ? 'var(--accent-glow)' : 'none',
-                  color: activeId === ch.id ? 'var(--t1)' : 'var(--t3)',
+                  color:      activeId === ch.id ? 'var(--t1)'          : 'var(--t3)',
                 }}
                 onMouseEnter={e => { if (activeId !== ch.id) { e.currentTarget.style.background = 'var(--bg-elev)'; e.currentTarget.style.color = 'var(--t2)' } }}
                 onMouseLeave={e => { if (activeId !== ch.id) { e.currentTarget.style.background = ''; e.currentTarget.style.color = '' } }}
@@ -139,13 +194,14 @@ export default function CommunityPage() {
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   # {ch.name}
                 </span>
-                {ch.count > 0 && (
+                {/* Real member count — 0 means empty, don't show badge */}
+                {(ch.memberCount > 0) && (
                   <span style={{
                     background: 'var(--accent)', color: '#fff',
                     fontSize: 10, fontWeight: 900,
                     padding: '2px 6px', borderRadius: 'var(--r-full)',
                   }}>
-                    {ch.count}
+                    {ch.memberCount}
                   </span>
                 )}
               </button>
@@ -190,8 +246,9 @@ export default function CommunityPage() {
               {activeChannel?.description}
             </span>
           </div>
+          {/* Real live count from socket room size */}
           <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>
-            🟢 {channels.find(c => c.id === activeId)?.count || 0} online
+            🟢 {activeChannel?.memberCount ?? 0} online
           </span>
         </header>
 
@@ -224,10 +281,10 @@ export default function CommunityPage() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ width: 30, flexShrink: 0 }} />
                   <p style={{ fontSize: 14, color: 'var(--t1)', lineHeight: 1.6, wordBreak: 'break-word', flex: 1 }}>
-                    {msg.message}
+                    {msg.content}  {/* ← real field name from server */}
                   </p>
                   <button
-                    onClick={() => report(msg.id)}
+                    onClick={() => report(msg)}
                     disabled={reportedIds.has(msg.id)}
                     style={{
                       fontSize: 13, padding: '2px 4px', borderRadius: 'var(--r-xs)',
@@ -249,12 +306,15 @@ export default function CommunityPage() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+        <form
+          onSubmit={sendMsg}
+          style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}
+        >
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(e) } }}
-            placeholder={`💬 Message #${activeChannel?.name}…`}
+            placeholder={`💬 Message #${activeChannel?.name ?? ''}…`}
             rows={1}
             style={{
               flex: 1, background: 'var(--bg-elev)', border: '1px solid var(--border)',
@@ -266,7 +326,7 @@ export default function CommunityPage() {
             onBlur={e => e.target.style.borderColor = ''}
           />
           <button
-            onClick={sendMsg}
+            type="submit"
             disabled={!input.trim()}
             style={{
               background: 'var(--accent)', color: '#fff',
@@ -280,7 +340,7 @@ export default function CommunityPage() {
           >
             Send 🚀
           </button>
-        </div>
+        </form>
       </main>
 
       {/* Create channel modal */}
@@ -295,7 +355,12 @@ export default function CommunityPage() {
           onClick={() => setShowCreate(false)}
         >
           <CreateChanModal
-            onCreated={ch => { setChannels(p => [...p, ch]); setShowCreate(false); setActiveId(ch.id) }}
+            username={username}
+            onCreated={ch => {
+              setChannels(p => [...p, ch])
+              setShowCreate(false)
+              setActiveId(ch.id)
+            }}
             onClose={() => setShowCreate(false)}
           />
         </div>
@@ -304,17 +369,32 @@ export default function CommunityPage() {
   )
 }
 
-function CreateChanModal({ onCreated, onClose }) {
+/* ── Create Channel Modal — calls real API ── */
+function CreateChanModal({ username, onCreated, onClose }) {
   const EMOJIS = ['💬','📚','🎮','🎵','🎨','🏀','💻','🍕','✈️','🐶','🌙','⚡','🔥','💡','🎯']
-  const [name,  setName]  = useState('')
-  const [desc,  setDesc]  = useState('')
-  const [emoji, setEmoji] = useState('💬')
-  const [err,   setErr]   = useState('')
+  const [name,    setName]    = useState('')
+  const [desc,    setDesc]    = useState('')
+  const [emoji,   setEmoji]   = useState('💬')
+  const [err,     setErr]     = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function create(e) {
+  async function create(e) {
     e.preventDefault()
     if (!name.trim()) return setErr('Name required')
-    onCreated({ id: Date.now().toString(), emoji, name: name.trim().toLowerCase().replace(/\s/g, '-'), description: desc.trim(), count: 0 })
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API}/community/channels`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: name.trim(), description: desc.trim(), emoji, username }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error || 'Failed to create channel'); setLoading(false); return }
+      onCreated({ id: data.id, name: data.name, emoji, description: desc.trim(), memberCount: 0 })
+    } catch {
+      setErr('Cannot reach server.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -330,19 +410,20 @@ function CreateChanModal({ onCreated, onClose }) {
         ✨ Create a Channel
       </h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-        {EMOJIS.map(e => (
+        {EMOJIS.map(em => (
           <button
-            key={e}
-            onClick={() => setEmoji(e)}
+            key={em}
+            type="button"
+            onClick={() => setEmoji(em)}
             style={{
               width: 40, height: 40, borderRadius: 'var(--r-sm)',
               fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: emoji === e ? 'var(--accent-glow)' : 'var(--bg-elev)',
-              border: emoji === e ? '2px solid var(--accent)' : '2px solid transparent',
+              background: emoji === em ? 'var(--accent-glow)' : 'var(--bg-elev)',
+              border: emoji === em ? '2px solid var(--accent)' : '2px solid transparent',
               cursor: 'pointer', transition: 'all var(--t-fast)',
             }}
           >
-            {e}
+            {em}
           </button>
         ))}
       </div>
@@ -354,17 +435,14 @@ function CreateChanModal({ onCreated, onClose }) {
           <div style={{
             display: 'flex', alignItems: 'center',
             background: 'var(--bg-elev)', border: '1px solid var(--border)',
-            borderRadius: 'var(--r-md)', overflow: 'hidden', transition: 'border-color var(--t-fast)',
-          }}
-            onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-            onBlur={e => e.currentTarget.style.borderColor = ''}
-          >
+            borderRadius: 'var(--r-md)', overflow: 'hidden',
+          }}>
             <span style={{ padding: '10px 12px', fontSize: 15, fontWeight: 900, color: 'var(--t3)', borderRight: '1px solid var(--border)', userSelect: 'none' }}>
               #
             </span>
             <input
               value={name}
-              onChange={e => setName(e.target.value.toLowerCase().replace(/\s/g, '-'))}
+              onChange={e => { setName(e.target.value.toLowerCase().replace(/\s/g, '-')); setErr('') }}
               placeholder="my-channel" maxLength={32} autoFocus
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--t1)', fontSize: 14, padding: '10px 12px', fontFamily: 'var(--font-body)' }}
             />
@@ -381,7 +459,7 @@ function CreateChanModal({ onCreated, onClose }) {
             style={{
               background: 'var(--bg-elev)', border: '1px solid var(--border)',
               borderRadius: 'var(--r-md)', color: 'var(--t1)', fontSize: 14,
-              padding: '10px 14px', outline: 'none', transition: 'border-color var(--t-fast)',
+              padding: '10px 14px', outline: 'none',
               fontFamily: 'var(--font-body)',
             }}
             onFocus={e => e.target.style.borderColor = 'var(--accent)'}
@@ -396,7 +474,6 @@ function CreateChanModal({ onCreated, onClose }) {
               padding: '10px 18px', borderRadius: 'var(--r-md)',
               border: '1px solid var(--border)', color: 'var(--t2)',
               fontSize: 14, fontWeight: 600, background: 'none', cursor: 'pointer',
-              transition: 'all var(--t-fast)',
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--t1)'; e.currentTarget.style.background = 'var(--accent-glow)' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.color = ''; e.currentTarget.style.background = '' }}
@@ -405,16 +482,17 @@ function CreateChanModal({ onCreated, onClose }) {
           </button>
           <button
             type="submit"
+            disabled={loading}
             style={{
               padding: '10px 20px', borderRadius: 'var(--r-md)',
               background: 'var(--accent)', color: '#fff',
               fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
-              transition: 'background var(--t-fast)',
+              opacity: loading ? 0.6 : 1,
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-h)'}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--accent-h)' }}
             onMouseLeave={e => e.currentTarget.style.background = ''}
           >
-            {emoji} Create
+            {loading ? 'Creating…' : `${emoji} Create`}
           </button>
         </div>
       </form>

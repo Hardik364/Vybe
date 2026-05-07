@@ -2,7 +2,26 @@
   "comment": "In development mode (NODE_ENV != production) any email is accepted. In production the domain must match a known institution OR end in a recognised pattern.",
   "patterns": [
     ".ac.in",
-    ".edu.in"
+    ".edu.in",
+    ".edu.au",
+    ".ac.uk",
+    ".ac.nz",
+    ".edu.sg",
+    ".edu.my",
+    ".edu.pk",
+    ".edu.bd",
+    ".edu.hk",
+    ".edu.ph",
+    ".ac.za",
+    ".ac.jp",
+    ".edu.tw",
+    ".ac.kr",
+    ".edu.cn",
+    ".edu.br",
+    ".edu.mx",
+    ".ac.il",
+    ".ac.ae",
+    ".edu"
   ],
   "known": [
     "iitb.ac.in","iitd.ac.in","iitk.ac.in","iitm.ac.in","iitkgp.ac.in",

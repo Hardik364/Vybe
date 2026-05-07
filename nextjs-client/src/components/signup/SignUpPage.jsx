@@ -28,6 +28,7 @@ export default function SignUpPage() {
   const [pendingName, setPendingName] = useState('')
   const [isRet, setIsRet] = useState(false)
   const [err, setErr] = useState('')
+  const [guestErr, setGuestErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [guestDone, setGuestDone] = useState(false)
 
@@ -50,7 +51,7 @@ export default function SignUpPage() {
   }, [])
 
   function otpSent(email, name, ret) {
-    setPendingEmail(email); setPendingName(name); setIsRet(ret); setStep('otp'); setErr('')
+    setPendingEmail(email); setPendingName(name); setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
   }
 
   async function handleVerified(token, username) {
@@ -72,10 +73,10 @@ export default function SignUpPage() {
         localStorage.setItem('ub_guest', '1')
         router.push('/chat')
       } else {
-        setErr(data.error || 'Guest limit reached. Please sign up.')
+        setGuestErr(data.error || 'Guest limit reached. Please sign up.')
       }
     } catch {
-      setErr('Cannot reach server. Check your connection.')
+      setGuestErr('Cannot reach server. Check your connection.')
     } finally {
       setLoading(false)
     }
@@ -208,17 +209,16 @@ export default function SignUpPage() {
               <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
             <button
-              onClick={handleGuest}
+              onClick={() => { setGuestErr(''); handleGuest() }}
               disabled={loading}
               className="btn-ghost"
             >
               {loading ? <Spinner size={16} /> : '🚀 Try as Guest — 1 free call'}
             </button>
             <p style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', marginTop: 8 }}>No email needed. Jump right in.</p>
+            {guestErr && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', marginTop: 8, animation: 'shake 300ms ease' }}>{guestErr}</p>}
           </>
         )}
-
-        {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', marginTop: 12, animation: 'shake 300ms ease' }}>{err}</p>}
 
         <p style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: 'var(--t3)' }}>
           Want community chat?{' '}

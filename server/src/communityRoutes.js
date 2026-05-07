@@ -32,8 +32,13 @@ async function seedDefaultChannels() {
     }
 }
 
-// Seed on startup
-seedDefaultChannels().catch(console.error)
+// Seed once Redis is ready — listen for the 'ready' event to avoid
+// ClientClosedError when the module loads before client.connect() runs
+client.on('ready', () => {
+    seedDefaultChannels().catch(err =>
+        console.error('[Community] seedDefaultChannels failed:', err.message)
+    )
+})
 
 // ── GET /community/channels ───────────────────────────────────
 // Returns all channels ordered by member activity

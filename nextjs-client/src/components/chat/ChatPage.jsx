@@ -33,8 +33,34 @@ export default function ChatPage() {
   useEffect(() => {
     const u = localStorage.getItem('ub_username')
     const t = localStorage.getItem('ub_token')
+
+    // No credentials at all → go to signup
     if (!u && !t) { router.push('/signup'); return }
-    if (!username) setUsername(u || 'Guest')   // fallback if lazy-init missed it
+
+    // Verify the token is actually valid (not expired / tampered).
+    // Guests (isGuest flag) skip server validation — their token is
+    // checked by the socket handshake instead.
+    const isGuest = localStorage.getItem('ub_guest') === '1'
+    if (t && !isGuest) {
+      fetch(`${process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.valid) {
+            // Token expired or invalid — clear and send to signup
+            localStorage.removeItem('ub_token')
+            localStorage.removeItem('ub_username')
+            router.push('/signup')
+          }
+        })
+        .catch(() => {
+          // Server unreachable — still allow in so user isn't locked out
+          // (socket will fail gracefully if server is truly down)
+        })
+    }
+
+    if (!username) setUsername(u || 'Guest')
     initIceServers()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
   }, [])
@@ -150,7 +176,7 @@ export default function ChatPage() {
         tier={userTier}
         onUpgradeClick={() => setShowUpgrade(true)}
         onAccount={() => router.push('/account')}
-        onCommunity={() => router.push('/community')}
+        onCommunity={() => router.push('/signup')}
       />
 
       <div className="chat-layout">

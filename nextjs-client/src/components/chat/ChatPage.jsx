@@ -22,12 +22,19 @@ const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 export default function ChatPage() {
   const router = useRouter()
 
-  const [username, setUsername] = useState(null)
+  // Read username synchronously so it's never null on first render.
+  // This prevents useSocket from firing its !username → router.push('/signup')
+  // guard before we've had a chance to check localStorage.
+  const [username, setUsername] = useState(() => {
+    if (typeof window === 'undefined') return null   // SSR guard
+    return localStorage.getItem('ub_username') || null
+  })
+
   useEffect(() => {
     const u = localStorage.getItem('ub_username')
     const t = localStorage.getItem('ub_token')
     if (!u && !t) { router.push('/signup'); return }
-    setUsername(u || 'Guest')
+    if (!username) setUsername(u || 'Guest')   // fallback if lazy-init missed it
     initIceServers()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
   }, [])

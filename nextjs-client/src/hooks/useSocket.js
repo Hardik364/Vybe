@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'   // still needed for accountSuspended redirect
 import setPcInstance from '@/utils/pcInstance'
 
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
@@ -15,7 +15,11 @@ export default function useSocket(
   const router = useRouter()
 
   useEffect(() => {
-    if (!username) { router.push('/signup'); return }
+    // Don't create a socket until username is resolved.
+    // ChatPage handles the auth redirect — we must NOT redirect here
+    // because username starts as null before localStorage is read,
+    // which would cause an instant signup↔chat redirect loop.
+    if (!username) return
 
     const token    = localStorage.getItem('ub_token')
     const isGuest  = localStorage.getItem('ub_guest') === '1'

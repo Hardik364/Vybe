@@ -26,6 +26,21 @@ export function getStateForDomain(domain) {
     return domainToState[domain] || null
 }
 
+// All valid Indian states / UTs — used to distinguish domestic vs international users
+const INDIAN_STATES = new Set([
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    'Delhi', 'Chandigarh', 'Puducherry', 'Jammu & Kashmir', 'Ladakh',
+    'Andaman & Nicobar Islands', 'Dadra & Nagar Haveli', 'Daman & Diu', 'Lakshadweep',
+])
+
+export function isIndianState(state) {
+    return INDIAN_STATES.has(state)
+}
+
 // Returns ordered list of queue keys to try when finding a match.
 // First match found wins — tighter scopes are always tried first.
 //
@@ -45,24 +60,28 @@ export function getMatchQueues(socket) {
     }
 
     if (tier === 'plus') {
-        // Plus: own uni first, then all other unis in the same state
-        // Prefer the user's self-declared state; fall back to domain map
+        // Plus: own uni first, then expand by location
+        // Indian students → all other unis in the same state
+        // International students → global pool (no state-level expansion possible)
         const state  = socket.userState || getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
-        if (state) {
+        if (state && isIndianState(state)) {
             const stateDomains = stateMap[state] || []
             for (const d of stateDomains) {
                 if (d !== domain) queues.push(`${prefix}:${d}`)
             }
+        } else if (state) {
+            // Abroad: Plus gives them global pool since no state-level bucket exists
+            queues.push(`${prefix}:global`)
         }
         return queues
     }
 
     if (tier === 'pro') {
-        // Pro: own uni → same state → global pool
+        // Pro: own uni → same state (Indian) or skip → global pool
         const state  = socket.userState || getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
-        if (state) {
+        if (state && isIndianState(state)) {
             const stateDomains = stateMap[state] || []
             for (const d of stateDomains) {
                 if (d !== domain) queues.push(`${prefix}:${d}`)

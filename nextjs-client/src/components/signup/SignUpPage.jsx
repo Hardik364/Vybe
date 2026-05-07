@@ -213,19 +213,23 @@ export default function SignUpPage() {
   )
 }
 
-// Indian states + UTs for the state picker
-const INDIAN_STATES = [
+// Indian states + UTs
+const INDIA_REGIONS = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
   'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
   'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
   'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
   'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  // Union Territories
   'Delhi', 'Chandigarh', 'Puducherry', 'Jammu & Kashmir', 'Ladakh',
-  'Andaman & Nicobar Islands', 'Dadra & Nagar Haveli', 'Daman & Diu',
-  'Lakshadweep',
-  // For international / exchange students
-  'Other / International',
+  'Andaman & Nicobar Islands', 'Dadra & Nagar Haveli', 'Daman & Diu', 'Lakshadweep',
+]
+
+// Countries where Indian students commonly study abroad
+const ABROAD_COUNTRIES = [
+  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany',
+  'Singapore', 'New Zealand', 'Ireland', 'Netherlands', 'France',
+  'Japan', 'UAE', 'Sweden', 'Switzerland', 'Italy', 'Malaysia',
+  'South Korea', 'China', 'Russia', 'Other Country',
 ]
 
 /* ── Step: New Account ── */
@@ -275,10 +279,17 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
         onChange={e => { setState(e.target.value); setErr('') }}
         style={{ color: state ? 'var(--t1)' : 'var(--t4)', cursor: 'pointer' }}
       >
-        <option value="" disabled>📍 Select your college state / UT</option>
-        {INDIAN_STATES.map(s => (
-          <option key={s} value={s}>{s}</option>
-        ))}
+        <option value="" disabled>📍 Where is your college?</option>
+        <optgroup label="🇮🇳 India — States & UTs">
+          {INDIA_REGIONS.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </optgroup>
+        <optgroup label="🌍 Studying Abroad">
+          {ABROAD_COUNTRIES.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </optgroup>
       </select>
       {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>📨 Send Verification Code →</PrimaryBtn>

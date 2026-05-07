@@ -37,7 +37,12 @@ export default function useSocket(
     setSocket(newSocket)
 
     newSocket.on('guestLimitReached', () => {
-      localStorage.setItem('ub_guest_limit', '1')
+      // Clear the guest session completely so SignUpPage doesn't
+      // auto-redirect back to /chat and create a bounce loop.
+      localStorage.removeItem('ub_token')
+      localStorage.removeItem('ub_username')
+      localStorage.removeItem('ub_guest')
+      localStorage.setItem('ub_guest_limit', '1')   // tells signup to show "sign up" prompt
       router.push('/signup')
     })
 

@@ -29,8 +29,17 @@ export default function SignUpPage() {
   const [isRet, setIsRet] = useState(false)
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [guestDone, setGuestDone] = useState(false)
 
   useEffect(() => {
+    if (localStorage.getItem('ub_guest_limit')) setGuestDone(true)
+  }, [])
+
+  useEffect(() => {
+    // If guest used their free call, keep them on signup — don't auto-redirect
+    const guestLimitHit = localStorage.getItem('ub_guest_limit')
+    if (guestLimitHit) return
+
     const token = localStorage.getItem('ub_token')
     if (token) {
       fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
@@ -47,6 +56,8 @@ export default function SignUpPage() {
   async function handleVerified(token, username) {
     localStorage.setItem('ub_token', token)
     localStorage.setItem('ub_username', username)
+    localStorage.removeItem('ub_guest')
+    localStorage.removeItem('ub_guest_limit')   // real account — clear guest flag
     router.push('/chat')
   }
 
@@ -148,6 +159,16 @@ export default function SignUpPage() {
           <div className="form-logo-mark">U</div>
           UniBuddy
         </div>
+
+        {guestDone && step !== 'otp' && (
+          <div style={{
+            background: 'var(--accent-glow)', border: '1.5px solid var(--accent)',
+            borderRadius: 'var(--r-md)', padding: '12px 16px', marginBottom: 4,
+            fontSize: 13, color: 'var(--t1)', lineHeight: 1.5,
+          }}>
+            🎉 <strong>Your free call is done!</strong> Create a free account to keep going — no limits, no cost.
+          </div>
+        )}
 
         <h2 className="form-heading">
           {step === 'otp' ? '📬 Check your inbox' : step === 'new' ? '👋 Create account' : '👋 Welcome back'}

@@ -20,7 +20,10 @@ export default function CommunityPage() {
   const [activeId,    setActiveId]    = useState('1')
   const [messages,    setMessages]    = useState([])
   const [input,       setInput]       = useState('')
-  const [username,    setUsername]    = useState('You')
+  // Read synchronously — no 'You' flash on first render
+  const [username,    setUsername]    = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('ub_username') || 'Student' : 'Student'
+  )
   const [showCreate,  setShowCreate]  = useState(false)
   const [reportedIds, setReportedIds] = useState(new Set())
   const socketRef = useRef(null)
@@ -29,8 +32,7 @@ export default function CommunityPage() {
   const activeChannel = channels.find(c => c.id === activeId)
 
   useEffect(() => {
-    const u = localStorage.getItem('ub_username') || 'Student'
-    setUsername(u)
+    const u     = localStorage.getItem('ub_username') || 'Student'
     const token = localStorage.getItem('ub_token')
     const sock = io(API, {
       transports: ['websocket'],

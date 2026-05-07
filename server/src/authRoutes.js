@@ -41,7 +41,7 @@ function isCollegeEmail(email) {
 // For returning users, username is optional — we look it up from Redis.
 router.post('/send-otp', async (req, res) => {
     try {
-        const { email, username } = req.body
+        const { email, username, state } = req.body
         if (!email) {
             return res.status(400).json({ error: 'Email is required' })
         }
@@ -76,8 +76,8 @@ router.post('/send-otp', async (req, res) => {
 
         const otp = generateOtp()
 
-        // Store OTP with resolved username
-        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({ otp, username: resolvedName }))
+        // Store OTP with resolved username (and state for new signups)
+        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({ otp, username: resolvedName, state: state || null }))
 
         // Increment attempt counter (expires in 10min)
         await client.incr(`otp-attempts:${emailLower}`)
@@ -115,7 +115,7 @@ router.post('/verify-otp', async (req, res) => {
             return res.status(400).json({ error: 'OTP expired or not found. Request a new one.' })
         }
 
-        const { otp: correctOtp, username } = JSON.parse(stored)
+        const { otp: correctOtp, username, state } = JSON.parse(stored)
 
         if (otp.trim() !== correctOtp) {
             return res.status(400).json({ error: 'Incorrect OTP. Try again.' })
@@ -138,8 +138,14 @@ router.post('/verify-otp', async (req, res) => {
             await client.set(`user:username:${emailLower}`, username)
         }
 
+        // ── Cache state in Redis so socket layer can find it fast ────────────
+        // state only comes from new signups; returning users already have it cached
+        if (state) {
+            await client.set(`user:state:${emailLower}`, state)
+        }
+
         // ── Persist to Supabase (non-blocking — don't fail auth if DB is down) ──
-        upsertUser({ email: emailLower, username: finalUsername, collegeDomain })
+        upsertUser({ email: emailLower, username: finalUsername, collegeDomain, state })
             .catch(err => console.error('[Auth] Supabase upsertUser failed:', err.message))
 
         // Issue JWT (valid for 7 days)

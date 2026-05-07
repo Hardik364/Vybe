@@ -213,21 +213,38 @@ export default function SignUpPage() {
   )
 }
 
+// Indian states + UTs for the state picker
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  // Union Territories
+  'Delhi', 'Chandigarh', 'Puducherry', 'Jammu & Kashmir', 'Ladakh',
+  'Andaman & Nicobar Islands', 'Dadra & Nagar Haveli', 'Daman & Diu',
+  'Lakshadweep',
+  // For international / exchange students
+  'Other / International',
+]
+
 /* ── Step: New Account ── */
 function StepNew({ onOtp, err, setErr, loading, setLoading }) {
-  const [name, setName] = useState('')
+  const [name,  setName]  = useState('')
   const [email, setEmail] = useState('')
+  const [state, setState] = useState('')
 
   async function submit(e) {
     e.preventDefault()
-    if (!name.trim()) return setErr('Enter your name')
+    if (!name.trim())  return setErr('Enter your name')
     if (!email.trim()) return setErr('Enter your college email')
+    if (!state)        return setErr('Select your college state')
     setLoading(true)
     try {
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), username: name.trim() }),
+        body: JSON.stringify({ email: email.trim(), username: name.trim(), state }),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
@@ -252,6 +269,17 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
         onChange={e => { setEmail(e.target.value); setErr('') }}
         maxLength={80}
       />
+      <select
+        className="ub-input no-ico"
+        value={state}
+        onChange={e => { setState(e.target.value); setErr('') }}
+        style={{ color: state ? 'var(--t1)' : 'var(--t4)', cursor: 'pointer' }}
+      >
+        <option value="" disabled>📍 Select your college state / UT</option>
+        {INDIAN_STATES.map(s => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
       {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>📨 Send Verification Code →</PrimaryBtn>
     </form>

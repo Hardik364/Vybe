@@ -28,6 +28,11 @@ export function getStateForDomain(domain) {
 
 // Returns ordered list of queue keys to try when finding a match.
 // First match found wins — tighter scopes are always tried first.
+//
+// State resolution order:
+//  1. socket.userState — user self-declared at signup (most accurate)
+//  2. stateMap.json domain lookup — covers colleges in the hardcoded list
+//  3. No state — Plus tier falls back to own-college only
 export function getMatchQueues(socket) {
     const domain = socket.collegeDomain || 'global'
     const tier   = socket.tier          || 'free'
@@ -41,7 +46,8 @@ export function getMatchQueues(socket) {
 
     if (tier === 'plus') {
         // Plus: own uni first, then all other unis in the same state
-        const state  = getStateForDomain(domain)
+        // Prefer the user's self-declared state; fall back to domain map
+        const state  = socket.userState || getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
         if (state) {
             const stateDomains = stateMap[state] || []
@@ -54,7 +60,7 @@ export function getMatchQueues(socket) {
 
     if (tier === 'pro') {
         // Pro: own uni → same state → global pool
-        const state  = getStateForDomain(domain)
+        const state  = socket.userState || getStateForDomain(domain)
         const queues = [`${prefix}:${domain}`]
         if (state) {
             const stateDomains = stateMap[state] || []

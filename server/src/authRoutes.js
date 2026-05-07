@@ -251,4 +251,37 @@ router.post('/set-tier', async (req, res) => {
     }
 })
 
+// ── POST /auth/guest ──────────────────────────────────────────
+// Guest login: creates a temporary token for one free call
+router.post('/guest', async (req, res) => {
+    try {
+        const deviceId = req.body?.deviceId || crypto.randomBytes(16).toString('hex')
+        const guestIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip
+        const guestKey = `guest:${guestIp}`
+
+        // Check if this IP has already used their free guest call
+        const guestUsed = await client.get(guestKey)
+        if (guestUsed) {
+            return res.status(429).json({ error: 'Guest limit reached. Please sign up.' })
+        }
+
+        // Mark this IP as having used their guest call (expires in 24h)
+        await client.setEx(guestKey, 24 * 60 * 60, '1')
+
+        // Generate a guest token (valid for 24 hours)
+        const token = jwt.sign(
+            { username: `Guest${Math.random().toString(36).substr(2, 5).toUpperCase()}`, isGuest: true, deviceId },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        )
+
+        console.log(`[Guest] New guest session from ${guestIp}`)
+        res.json({ success: true, token, username: 'Guest' })
+
+    } catch (err) {
+        console.error('[guest]', err)
+        res.status(500).json({ error: 'Failed to create guest session.' })
+    }
+})
+
 export default router

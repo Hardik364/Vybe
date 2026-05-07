@@ -41,16 +41,17 @@ app.use((req, res, next) => {
 // General API: 100 requests per 15 minutes per IP
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 100 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 })
 
-// Auth endpoints: stricter — 10 per 15 minutes per IP
+// Auth endpoints: 30 per 15 min in production (was 10 — too strict for normal use)
+// e.g. user requests OTP, it expires, requests again — 10 runs out fast
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: process.env.NODE_ENV === 'production' ? 30 : 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth attempts, please try again later.' }

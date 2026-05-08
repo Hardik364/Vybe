@@ -159,19 +159,29 @@ export function handelSocketConnection(io, socket) {
     socket.on('videoOff', ({ to }) => io.to(to).emit('partnerVideoOff'))
 
     // ── Connect / Move On ─────────────────────────────────────
-    socket.on('connectRequest', ({ to }) => {
+    socket.on('connectRequest', ({ to, contact }) => {
+        // Always notify partner immediately that this user pressed Connect
+        io.to(to).emit('partnerConnect')
+
         if (pendingConnects.has(to) && pendingConnects.get(to).partnerId === socket.id) {
-            clearTimeout(pendingConnects.get(to).timer)
+            // Mutual connect — exchange contacts
+            const theirEntry = pendingConnects.get(to)
+            clearTimeout(theirEntry.timer)
             pendingConnects.delete(to)
             pendingConnects.delete(socket.id)
-            io.to(socket.id).emit('contactsExchanged')
-            io.to(to).emit('contactsExchanged')
+
+            // Build { whatsapp, instagram } objects for each side
+            const toData = contact => contact?.value
+                ? { [contact.type]: contact.value }
+                : {}
+            io.to(socket.id).emit('contactsExchanged', toData(theirEntry.contact))
+            io.to(to).emit('contactsExchanged', toData(contact))
         } else {
             const timer = setTimeout(() => {
                 pendingConnects.delete(socket.id)
                 io.to(socket.id).emit('connectExpired')
             }, 31000)
-            pendingConnects.set(socket.id, { partnerId: to, timer })
+            pendingConnects.set(socket.id, { partnerId: to, timer, contact: contact || null })
             io.to(socket.id).emit('connectPending')
         }
     })

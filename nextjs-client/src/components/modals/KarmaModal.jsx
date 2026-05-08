@@ -1,17 +1,11 @@
 'use client'
 
-const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
-
 export default function KarmaModal({ strangerUsername, strangerUserId, socket, onRate }) {
-  async function rate(r) {
-    const token = localStorage.getItem('ub_token')
-    try {
-      await fetch(`${API}/api/rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ratedUserId: strangerUserId, rating: r }),
-      })
-    } catch {}
+  function rate(r) {
+    // Use socket — the rateUser handler checks partnership and updates karma in Redis
+    if (socket && strangerUserId) {
+      socket.emit('rateUser', { to: strangerUserId, rating: r })
+    }
     onRate()
   }
 

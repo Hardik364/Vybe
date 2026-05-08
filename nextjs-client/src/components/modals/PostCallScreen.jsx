@@ -18,12 +18,19 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
     return () => clearTimeout(t)
   }, [timer])
 
-  // Listen for mutual connect
+  // Listen for mutual connect / partner actions
   useEffect(() => {
     if (!socket) return
-    socket.on('partnerConnect', () => setTheyPressed(true))
-    socket.on('contactsExchanged', data => setExchanged(data))
-    return () => { socket.off('partnerConnect'); socket.off('contactsExchanged') }
+    socket.on('partnerConnect',   () => setTheyPressed(true))
+    socket.on('contactsExchanged', data => setExchanged(data || {}))
+    socket.on('connectExpired',   () => { if (!exchanged) onMoveOn() })
+    socket.on('partnerMovedOn',   () => onMoveOn())
+    return () => {
+      socket.off('partnerConnect')
+      socket.off('contactsExchanged')
+      socket.off('connectExpired')
+      socket.off('partnerMovedOn')
+    }
   }, [socket])
 
   function handleConnect() {
@@ -156,7 +163,10 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
               {myPressed ? (theyPressed ? 'Both connected! 🎉' : 'Waiting for them…') : `${timer}s`}
             </span>
           </button>
-          <button onClick={onMoveOn} className="btn-moveon">
+          <button onClick={() => {
+            if (socket && strangerUserId) socket.emit('moveOn', { to: strangerUserId })
+            onMoveOn()
+          }} className="btn-moveon">
             <span>👋 Move On</span>
             <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.6 }}>Gone forever</span>
           </button>

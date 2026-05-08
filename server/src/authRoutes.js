@@ -23,7 +23,9 @@ function generateOtp() {
 }
 
 function isCollegeEmail(email) {
-    // In development mode accept any email for testing
+    // Skip validation when explicitly disabled (set ALLOW_ANY_EMAIL=1 on Render for testing)
+    if (process.env.ALLOW_ANY_EMAIL === '1') return true
+    // Also skip in local dev
     if (process.env.NODE_ENV !== 'production') return true
 
     const domain = email.split('@')[1]?.toLowerCase()
@@ -32,7 +34,7 @@ function isCollegeEmail(email) {
     // Check exact known domains
     if (known.includes(domain)) return true
 
-    // Check suffix patterns (.ac.in, .edu.in, .edu)
+    // Check suffix patterns (.ac.in, .edu.in, .edu, .edu.au, .ac.uk, etc.)
     return patterns.some(p => domain.endsWith(p))
 }
 
@@ -83,9 +85,9 @@ router.post('/send-otp', async (req, res) => {
         await client.incr(`otp-attempts:${emailLower}`)
         await client.expire(`otp-attempts:${emailLower}`, 600)
 
-        // In development: skip real email, log OTP to console and return it in response
-        const isDev = process.env.NODE_ENV !== 'production'
-        if (isDev) {
+        // Skip real email when ALLOW_ANY_EMAIL=1 (Render testing) or local dev
+        const skipEmail = process.env.ALLOW_ANY_EMAIL === '1' || process.env.NODE_ENV !== 'production'
+        if (skipEmail) {
             console.log(`\n[DEV] OTP for ${emailLower}: ${otp}\n`)
         } else {
             await sendOtpEmail(emailLower, otp, resolvedName)
@@ -93,10 +95,10 @@ router.post('/send-otp', async (req, res) => {
 
         res.json({
             success:     true,
-            message:     isDev ? `[DEV] OTP: ${otp}` : 'OTP sent to your email',
+            message:     skipEmail ? `[DEV] OTP: ${otp}` : 'OTP sent to your email',
             isReturning,
             username:    isReturning ? savedUsername : undefined,
-            ...(isDev && { devOtp: otp }),   // only in dev — visible in network tab
+            ...(skipEmail && { devOtp: otp }),   // visible in network tab when testing
         })
 
     } catch (err) {

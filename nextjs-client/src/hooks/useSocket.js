@@ -63,7 +63,11 @@ export default function useSocket(
       setStrangerUsername(data.strangerUsername)
       setConnectionStatus(true)
     })
-    socket.on('strangerLeftTheChat', clearState)
+    socket.on('strangerLeftTheChat', () => {
+      clearState()
+      // Explicitly re-queue — don't rely on useEffect chain (stale closure risk)
+      socket.emit('startConnection')
+    })
     socket.on('errMakingPair', () => socket.emit('startConnection'))
     socket.on('accountSuspended', msg => {
       localStorage.removeItem('ub_token')
@@ -94,7 +98,12 @@ export default function useSocket(
     if (updateUser > 0) {
       const prevId = strangerUserId
       clearState()
-      if (prevId && socket) socket.emit('pairedUserLeftTheChat', prevId)
+      if (prevId && socket) {
+        socket.emit('pairedUserLeftTheChat', prevId)
+      }
+      // Explicitly start searching again — don't rely on strangerUsername
+      // state change triggering the auto-start effect (stale closure risk)
+      if (socket) socket.emit('startConnection')
     }
   }, [updateUser])
 

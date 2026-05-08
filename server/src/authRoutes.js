@@ -83,14 +83,20 @@ router.post('/send-otp', async (req, res) => {
         await client.incr(`otp-attempts:${emailLower}`)
         await client.expire(`otp-attempts:${emailLower}`, 600)
 
-        // Send email
-        await sendOtpEmail(emailLower, otp, resolvedName)
+        // In development: skip real email, log OTP to console and return it in response
+        const isDev = process.env.NODE_ENV !== 'production'
+        if (isDev) {
+            console.log(`\n[DEV] OTP for ${emailLower}: ${otp}\n`)
+        } else {
+            await sendOtpEmail(emailLower, otp, resolvedName)
+        }
 
         res.json({
             success:     true,
-            message:     'OTP sent to your email',
+            message:     isDev ? `[DEV] OTP: ${otp}` : 'OTP sent to your email',
             isReturning,
             username:    isReturning ? savedUsername : undefined,
+            ...(isDev && { devOtp: otp }),   // only in dev — visible in network tab
         })
 
     } catch (err) {

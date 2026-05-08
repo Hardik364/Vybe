@@ -17,13 +17,17 @@ function pickPrompt() {
     return _prompts[Math.floor(Math.random() * _prompts.length)]
 }
 
-// Broadcast waiting count for this socket's college queue
+// Broadcast total online count for this socket's college
+// Uses the persistent college: room (everyone, waiting + in-call)
+// and also notifies users currently in calls via the college room directly.
 export async function emitLiveCount(io, socket) {
     try {
-        const queueKey = getSelfQueue(socket)
-        const count    = await client.lLen(queueKey)
-        const room     = `waiting:${socket.collegeDomain || 'global'}`
-        io.to(room).emit('liveCount', count)
+        const domain      = socket.collegeDomain || 'global'
+        const collegeRoom = `college:${domain}`
+        const roomSet     = io.sockets.adapter.rooms.get(collegeRoom)
+        const count       = roomSet ? roomSet.size : 0
+        // Broadcast to everyone in this college (waiting + in-call)
+        io.to(collegeRoom).emit('liveCount', count)
     } catch (err) {
         console.error('[emitLiveCount]', err)
     }

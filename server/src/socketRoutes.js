@@ -91,6 +91,11 @@ export function handelSocketConnection(io, socket) {
     // Register user in live registry
     registerUser(socket)
 
+    // Join a persistent college room — stays joined for the entire session
+    // (waiting AND in-call). Used for accurate live count.
+    const collegeRoom = `college:${socket.collegeDomain || 'global'}`
+    socket.join(collegeRoom)
+
     // ── Pairing ──────────────────────────────────────────────
     socket.on("startConnection", async () => {
         // Block guests who have already used their free call today

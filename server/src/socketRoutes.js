@@ -123,10 +123,10 @@ export function handelSocketConnection(io, socket) {
     // ── WebRTC signaling ─────────────────────────────────────
     socket.on('message', m => io.to(m.to).emit('message', m))
 
-    // ── Text chat ────────────────────────────────────────────
-    socket.on("private message", ({ content, to }) => {
-        if (isRateLimited(socket.id, 'private message')) return
-        io.to(to).emit("private message", { content, from: socket.id })
+    // ── Text chat ─────────────────────────────────────────────
+    socket.on('chatMessage', m => {
+        if (!m?.to || !m?.message) return
+        io.to(m.to).emit('messageResponse', { message: m.message })
     })
 
     // ── Prompt sync ──────────────────────────────────────────

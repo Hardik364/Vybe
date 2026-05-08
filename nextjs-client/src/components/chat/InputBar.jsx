@@ -7,7 +7,7 @@ export default function InputBar({ socket, setMessage, onNewUser, strangerUserId
   function sendMessage(e) {
     e.preventDefault()
     if (!input.trim() || !socket || !strangerUserId) return
-    socket.emit('message', { message: input.trim(), to: strangerUserId })
+    socket.emit('chatMessage', { message: input.trim(), to: strangerUserId })
     setMessage(prev => [...prev, { user: username || 'me', message: input.trim() }])
     setInput('')
   }

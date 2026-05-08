@@ -31,6 +31,7 @@ export default function SignUpPage() {
   const [guestErr, setGuestErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [guestDone, setGuestDone] = useState(false)
+  const [devOtp, setDevOtp] = useState(null)
 
   useEffect(() => {
     if (localStorage.getItem('ub_guest_limit')) setGuestDone(true)
@@ -50,8 +51,8 @@ export default function SignUpPage() {
     }
   }, [])
 
-  function otpSent(email, name, ret) {
-    setPendingEmail(email); setPendingName(name); setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
+  function otpSent(email, name, ret, otp = null) {
+    setPendingEmail(email); setPendingName(name); setIsRet(ret); setDevOtp(otp); setStep('otp'); setErr(''); setGuestErr('')
   }
 
   async function handleVerified(token, username) {
@@ -199,7 +200,7 @@ export default function SignUpPage() {
 
         {step === 'new'       && <StepNew       onOtp={otpSent} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
         {step === 'returning' && <StepReturn     onOtp={otpSent} onSwitch={() => setStep('new')} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
-        {step === 'otp'       && <StepOtp        email={pendingEmail} name={pendingName} isRet={isRet} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
+        {step === 'otp'       && <StepOtp        email={pendingEmail} name={pendingName} isRet={isRet} devOtp={devOtp} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
 
         {step !== 'otp' && (
           <>
@@ -365,7 +366,7 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
-      onOtp(email.trim(), name.trim(), false)
+      onOtp(email.trim(), name.trim(), false, data.devOtp || null)
     } catch {
       setErr('Cannot reach server.'); setLoading(false)
     }
@@ -434,7 +435,7 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
-      onOtp(email.trim(), data.username || '', true)
+      onOtp(email.trim(), data.username || '', true, data.devOtp || null)
     } catch {
       setErr('Cannot reach server.'); setLoading(false)
     }
@@ -458,7 +459,7 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
 }
 
 /* ── Step: OTP ── */
-function StepOtp({ email, name, isRet, onVerified, onBack }) {
+function StepOtp({ email, name, isRet, devOtp, onVerified, onBack }) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -523,6 +524,19 @@ function StepOtp({ email, name, isRet, onVerified, onBack }) {
       <p style={{ fontSize: 14, color: 'var(--t2)', textAlign: 'center', lineHeight: 1.6 }}>
         Code sent to <strong style={{ color: 'var(--t1)' }}>{email}</strong>
       </p>
+      {devOtp && (
+        <div style={{
+          background: 'rgba(108,99,255,0.15)', border: '1.5px dashed var(--accent)',
+          borderRadius: 'var(--r-md)', padding: '10px 18px', textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 4, letterSpacing: 1 }}>
+            🧪 TEST MODE — YOUR OTP
+          </p>
+          <p style={{ fontSize: 28, fontWeight: 800, letterSpacing: 10, color: 'var(--t1)' }}>
+            {devOtp}
+          </p>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }} onPaste={paste}>
         {otp.map((d, i) => (
           <input

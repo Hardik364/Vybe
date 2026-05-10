@@ -11,7 +11,6 @@ import PromptCard from './PromptCard'
 import NotifyMe from '@/components/NotifyMe'
 import PostCallScreen from '@/components/modals/PostCallScreen'
 import KarmaModal from '@/components/modals/KarmaModal'
-import UpgradeModal from '@/components/modals/UpgradeModal'
 import useSocket from '@/hooks/useSocket'
 import usePeerConnection from '@/hooks/usePeerConnection'
 import { initIceServers } from '@/utils/pcInstance'
@@ -77,10 +76,8 @@ export default function ChatPage() {
   const [lastStrangerId, setLastStrangerId] = useState(null)
   const [activePrompt, setActivePrompt]     = useState(null)
   const [liveCount, setLiveCount]           = useState(0)
-  const [collegeDomain, setCollegeDomain]   = useState('global')
+  const [collegeDomain, setCollegeDomain]   = useState('launch')
   const [reportSent, setReportSent]         = useState(false)
-  const [showUpgrade, setShowUpgrade]       = useState(false)
-  const [userTier, setUserTier]             = useState('free')
 
   const localVideoRef  = useRef(null)
   const remoteVideoRef = useRef(null)
@@ -129,7 +126,7 @@ export default function ChatPage() {
     if (!token) return
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(d => { if (d.valid) { if (d.tier) setUserTier(d.tier); if (d.collegeDomain) setCollegeDomain(d.collegeDomain) } })
+      .then(d => { if (d.valid && d.collegeDomain) setCollegeDomain(d.collegeDomain) })
       .catch(() => {})
   }, [])
 
@@ -173,8 +170,6 @@ export default function ChatPage() {
         onPromptClick={handlePromptToggle}
         liveCount={liveCount}
         onLogout={() => { localStorage.clear(); router.push('/signup') }}
-        tier={userTier}
-        onUpgradeClick={() => setShowUpgrade(true)}
         onAccount={() => router.push('/account')}
         onCommunity={() => router.push('/signup')}
       />
@@ -267,13 +262,6 @@ export default function ChatPage() {
           strangerUserId={lastStrangerId || strangerUserId}
           socket={socket}
           onRate={handleKarmaRate}
-        />
-      )}
-      {showUpgrade && (
-        <UpgradeModal
-          currentTier={userTier}
-          onClose={() => setShowUpgrade(false)}
-          onTierChange={t => { setUserTier(t); setShowUpgrade(false) }}
         />
       )}
     </div>

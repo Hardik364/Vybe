@@ -3,7 +3,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 
 export default function Navbar({
   strangerUsername, connectionStatus, promptActive, onPromptClick,
-  liveCount, onLogout, tier, onUpgradeClick, onAccount, onCommunity
+  liveCount, onLogout, onAccount, onCommunity
 }) {
   return (
     <nav className="navbar">
@@ -51,19 +51,6 @@ export default function Navbar({
         >
           💬 {promptActive ? 'Hide Prompt' : 'Prompt'}
         </button>
-
-        {/* Upgrade pill */}
-        {tier === 'free' && (
-          <button
-            onClick={onUpgradeClick}
-            className="nav-pill"
-            style={{ '--hover-color': 'var(--amber)' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--amber)'; e.currentTarget.style.color = 'var(--amber)'; e.currentTarget.style.background = 'var(--amber-sub)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.color = ''; e.currentTarget.style.background = '' }}
-          >
-            ⚡ Upgrade
-          </button>
-        )}
 
         {/* Account */}
         <button onClick={onAccount} className="nav-ico" title="Account">

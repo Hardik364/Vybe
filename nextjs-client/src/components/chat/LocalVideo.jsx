@@ -9,6 +9,7 @@ export default function LocalVideo({
   const [videoEnabled,   setVideoEnabled]   = useState(false)
   const [partnerVideoOn, setPartnerVideoOn] = useState(false)
   const [videoLoading,   setVideoLoading]   = useState(false)
+  const [micMuted,       setMicMuted]       = useState(false)
   const videoSenderRef = useRef(null)
 
   // Audio-only stream on mount
@@ -47,6 +48,12 @@ export default function LocalVideo({
       setVideoEnabled(false)
     }
   }, [strangerUserId])
+
+  function toggleMic() {
+    if (!stream) return
+    stream.getAudioTracks().forEach(t => { t.enabled = !t.enabled })
+    setMicMuted(m => !m)
+  }
 
   async function toggleVideo() {
     if (!socket || !strangerUserId || !stream) return
@@ -113,25 +120,48 @@ export default function LocalVideo({
         </div>
       )}
 
-      {/* Video toggle button */}
-      <button
-        onClick={toggleVideo}
-        disabled={!strangerUserId || videoLoading}
-        style={{
-          position: 'absolute', bottom: 10,
-          left: '50%', transform: 'translateX(-50%)',
-          padding: '6px 16px', fontSize: 12, fontWeight: 600,
-          borderRadius: 'var(--r-full)', border: '1px solid',
-          transition: 'all var(--t-fast)', whiteSpace: 'nowrap',
-          zIndex: 10, backdropFilter: 'blur(10px)', cursor: 'pointer',
-          background: videoEnabled ? 'var(--accent-glow)' : 'oklch(0% 0 0/.72)',
-          borderColor: videoEnabled ? 'var(--accent)' : 'var(--border)',
-          color: videoEnabled ? 'var(--accent)' : 'var(--t2)',
-          opacity: (!strangerUserId || videoLoading) ? 0.4 : 1,
-        }}
-      >
-        {videoLoading ? '⏳' : videoEnabled ? '📷 Camera On' : '📷 Enable Video'}
-      </button>
+      {/* Bottom controls: mic + video */}
+      <div style={{
+        position: 'absolute', bottom: 10,
+        left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: 8, zIndex: 10,
+      }}>
+        {/* Mic mute/unmute — always available once stream exists */}
+        <button
+          onClick={toggleMic}
+          disabled={!stream}
+          style={{
+            padding: '6px 14px', fontSize: 12, fontWeight: 600,
+            borderRadius: 'var(--r-full)', border: '1px solid',
+            transition: 'all var(--t-fast)', whiteSpace: 'nowrap',
+            backdropFilter: 'blur(10px)', cursor: 'pointer',
+            background: micMuted ? 'rgba(239,68,68,0.2)' : 'oklch(0% 0 0/.72)',
+            borderColor: micMuted ? '#ef4444' : 'var(--border)',
+            color: micMuted ? '#ef4444' : 'var(--t2)',
+            opacity: !stream ? 0.4 : 1,
+          }}
+        >
+          {micMuted ? '🔇 Muted' : '🎙️ Mic On'}
+        </button>
+
+        {/* Video toggle */}
+        <button
+          onClick={toggleVideo}
+          disabled={!strangerUserId || videoLoading}
+          style={{
+            padding: '6px 14px', fontSize: 12, fontWeight: 600,
+            borderRadius: 'var(--r-full)', border: '1px solid',
+            transition: 'all var(--t-fast)', whiteSpace: 'nowrap',
+            backdropFilter: 'blur(10px)', cursor: 'pointer',
+            background: videoEnabled ? 'var(--accent-glow)' : 'oklch(0% 0 0/.72)',
+            borderColor: videoEnabled ? 'var(--accent)' : 'var(--border)',
+            color: videoEnabled ? 'var(--accent)' : 'var(--t2)',
+            opacity: (!strangerUserId || videoLoading) ? 0.4 : 1,
+          }}
+        >
+          {videoLoading ? '⏳' : videoEnabled ? '📷 Camera On' : '📷 Enable Video'}
+        </button>
+      </div>
     </div>
   )
 }

@@ -26,6 +26,12 @@ export function getStateForDomain(domain) {
     return domainToState[domain] || null
 }
 
+// Launch phase: all target colleges share one pool so they match each other.
+const LAUNCH_COLLEGES = new Set([
+    'chitkara.edu.in', 'chitkarauniversity.edu.in',
+    'cuchd.in', 'cumail.in', 'chandigarhuniversity.ac.in',
+])
+
 // All valid Indian states / UTs — used to distinguish domestic vs international users
 const INDIAN_STATES = new Set([
     'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -53,6 +59,9 @@ export function getMatchQueues(socket) {
     const tier   = socket.tier          || 'free'
     const shadow = socket.shadowBanned
     const prefix = shadow ? 'users:shadow' : 'users'
+
+    // Launch mode: all partner colleges share a single pool
+    if (LAUNCH_COLLEGES.has(domain)) return [`${prefix}:launch`]
 
     if (tier === 'free') {
         // Free: only own university
@@ -99,6 +108,8 @@ export function getSelfQueue(socket) {
     const domain = socket.collegeDomain || 'global'
     const shadow = socket.shadowBanned
     const prefix = shadow ? 'users:shadow' : 'users'
+    // Launch mode: all partner colleges share a single pool
+    if (LAUNCH_COLLEGES.has(domain)) return `${prefix}:launch`
     return `${prefix}:${domain}`
 }
 

@@ -31,7 +31,6 @@ export default function SignUpPage() {
   const [guestErr, setGuestErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [guestDone, setGuestDone] = useState(false)
-  const [devOtp, setDevOtp] = useState(null)
 
   useEffect(() => {
     if (localStorage.getItem('ub_guest_limit')) setGuestDone(true)
@@ -51,8 +50,8 @@ export default function SignUpPage() {
     }
   }, [])
 
-  function otpSent(email, name, ret, otp = null) {
-    setPendingEmail(email); setPendingName(name); setIsRet(ret); setDevOtp(otp); setStep('otp'); setErr(''); setGuestErr('')
+  function otpSent(email, name, ret) {
+    setPendingEmail(email); setPendingName(name); setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
   }
 
   async function handleVerified(token, username) {
@@ -200,7 +199,7 @@ export default function SignUpPage() {
 
         {step === 'new'       && <StepNew       onOtp={otpSent} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
         {step === 'returning' && <StepReturn     onOtp={otpSent} onSwitch={() => setStep('new')} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
-        {step === 'otp'       && <StepOtp        email={pendingEmail} name={pendingName} isRet={isRet} devOtp={devOtp} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
+        {step === 'otp'       && <StepOtp        email={pendingEmail} name={pendingName} isRet={isRet} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
 
         {step !== 'otp' && (
           <>
@@ -235,144 +234,29 @@ export default function SignUpPage() {
   )
 }
 
-// Country list (shown in first dropdown)
-const COUNTRIES = [
-  { code: 'IN', label: '🇮🇳 India' },
-  { code: 'US', label: '🇺🇸 United States' },
-  { code: 'GB', label: '🇬🇧 United Kingdom' },
-  { code: 'CA', label: '🇨🇦 Canada' },
-  { code: 'AU', label: '🇦🇺 Australia' },
-  { code: 'DE', label: '🇩🇪 Germany' },
-  { code: 'SG', label: '🇸🇬 Singapore' },
-  { code: 'NZ', label: '🇳🇿 New Zealand' },
-  { code: 'IE', label: '🇮🇪 Ireland' },
-  { code: 'NL', label: '🇳🇱 Netherlands' },
-  { code: 'FR', label: '🇫🇷 France' },
-  { code: 'JP', label: '🇯🇵 Japan' },
-  { code: 'AE', label: '🇦🇪 UAE' },
-  { code: 'SE', label: '🇸🇪 Sweden' },
-  { code: 'CH', label: '🇨🇭 Switzerland' },
-  { code: 'IT', label: '🇮🇹 Italy' },
-  { code: 'MY', label: '🇲🇾 Malaysia' },
-  { code: 'KR', label: '🇰🇷 South Korea' },
-  { code: 'CN', label: '🇨🇳 China' },
-  { code: 'RU', label: '🇷🇺 Russia' },
-  { code: 'OT', label: '🌐 Other Country' },
-]
-
-// State / province / region per country
-// Empty array = city-state or no meaningful subdivision → skip 2nd dropdown
-const REGIONS = {
-  IN: [
-    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
-    'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka',
-    'Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram',
-    'Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu',
-    'Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
-    'Delhi','Chandigarh','Puducherry','Jammu & Kashmir','Ladakh',
-    'Andaman & Nicobar Islands','Dadra & Nagar Haveli','Daman & Diu','Lakshadweep',
-  ],
-  US: [
-    'Alabama','Alaska','Arizona','Arkansas','California','Colorado',
-    'Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho',
-    'Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana',
-    'Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
-    'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey',
-    'New Mexico','New York','North Carolina','North Dakota','Ohio',
-    'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina',
-    'South Dakota','Tennessee','Texas','Utah','Vermont','Virginia',
-    'Washington','West Virginia','Wisconsin','Wyoming','Washington D.C.',
-  ],
-  GB: ['England','Scotland','Wales','Northern Ireland'],
-  CA: [
-    'Alberta','British Columbia','Manitoba','New Brunswick',
-    'Newfoundland and Labrador','Nova Scotia','Ontario',
-    'Prince Edward Island','Quebec','Saskatchewan',
-    'Northwest Territories','Nunavut','Yukon',
-  ],
-  AU: [
-    'New South Wales','Victoria','Queensland','Western Australia',
-    'South Australia','Tasmania','Australian Capital Territory','Northern Territory',
-  ],
-  DE: [
-    'Baden-Württemberg','Bavaria','Berlin','Brandenburg','Bremen',
-    'Hamburg','Hesse','Lower Saxony','Mecklenburg-Vorpommern',
-    'North Rhine-Westphalia','Rhineland-Palatinate','Saarland',
-    'Saxony','Saxony-Anhalt','Schleswig-Holstein','Thuringia',
-  ],
-  SG: [],   // city-state
-  NZ: ['Auckland','Wellington','Canterbury','Waikato','Otago','Other'],
-  IE: ['Leinster','Munster','Connacht','Ulster'],
-  NL: [
-    'North Holland','South Holland','Utrecht','North Brabant',
-    'Gelderland','Overijssel','Friesland','Groningen',
-    'Limburg','Zeeland','Drenthe','Flevoland',
-  ],
-  FR: [
-    'Île-de-France','Auvergne-Rhône-Alpes','Hauts-de-France','Grand Est',
-    'Occitanie','Nouvelle-Aquitaine','Provence-Alpes-Côte d\'Azur',
-    'Pays de la Loire','Bretagne','Normandie','Other',
-  ],
-  JP: ['Tokyo','Osaka','Kyoto','Hokkaido','Kanagawa','Aichi','Fukuoka','Other'],
-  AE: ['Abu Dhabi','Dubai','Sharjah','Ajman','Ras Al Khaimah','Fujairah','Umm Al Quwain'],
-  SE: ['Stockholm','Västra Götaland','Skåne','Uppsala','Other'],
-  CH: ['Zurich','Geneva','Basel','Bern','Vaud','Other'],
-  IT: ['Lombardy','Lazio','Tuscany','Campania','Veneto','Emilia-Romagna','Other'],
-  MY: ['Selangor','Kuala Lumpur','Johor','Penang','Sabah','Sarawak','Other'],
-  KR: ['Seoul','Busan','Daegu','Incheon','Daejeon','Gwangju','Other'],
-  CN: ['Beijing','Shanghai','Guangdong','Zhejiang','Jiangsu','Shandong','Other'],
-  RU: ['Moscow','Saint Petersburg','Novosibirsk','Other'],
-  OT: [],
-}
-
 /* ── Step: New Account ── */
 function StepNew({ onOtp, err, setErr, loading, setLoading }) {
-  const [name,    setName]    = useState('')
-  const [email,   setEmail]   = useState('')
-  const [country, setCountry] = useState('')   // COUNTRIES[].code
-  const [region,  setRegion]  = useState('')   // REGIONS[code][] value
-
-  const regions   = country ? (REGIONS[country] || []) : []
-  const needState = regions.length > 0
-
-  function handleCountry(e) {
-    setCountry(e.target.value)
-    setRegion('')   // reset region when country changes
-    setErr('')
-  }
-
-  // Build the location string sent to the backend:
-  //   India → just the state name      (e.g. "Maharashtra")
-  //   Others → "Country > Region"      (e.g. "Australia > Victoria")
-  //   City-states / Other → country label without flag emoji
-  function locationValue() {
-    const label = COUNTRIES.find(c => c.code === country)?.label.replace(/^.{3}/, '').trim() || ''
-    if (!needState) return label           // Singapore, Other Country, etc.
-    return country === 'IN' ? region : `${label} > ${region}`
-  }
+  const [name,  setName]  = useState('')
+  const [email, setEmail] = useState('')
 
   async function submit(e) {
     e.preventDefault()
-    if (!name.trim())             return setErr('Enter your name')
-    if (!email.trim())            return setErr('Enter your college email')
-    if (!country)                 return setErr('Select your country')
-    if (needState && !region)     return setErr('Select your state / province')
+    if (!name.trim())  return setErr('Enter your name')
+    if (!email.trim()) return setErr('Enter your college email')
     setLoading(true)
     try {
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), username: name.trim(), state: locationValue() }),
+        body: JSON.stringify({ email: email.trim(), username: name.trim() }),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
-      onOtp(email.trim(), name.trim(), false, data.devOtp || null)
+      onOtp(email.trim(), name.trim(), false)
     } catch {
       setErr('Cannot reach server.'); setLoading(false)
     }
   }
-
-  const selectStyle = val => ({ color: val ? 'var(--t1)' : 'var(--t4)', cursor: 'pointer' })
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
@@ -385,34 +269,10 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
       />
       <input
         className="ub-input no-ico"
-        type="email" placeholder="🎓 College email (you@iitb.ac.in)" value={email}
+        type="email" placeholder="🎓 College email (you@chitkara.edu.in)" value={email}
         onChange={e => { setEmail(e.target.value); setErr('') }}
         maxLength={80}
       />
-
-      {/* ── Country picker ── */}
-      <select className="ub-input no-ico" value={country} onChange={handleCountry} style={selectStyle(country)}>
-        <option value="" disabled>🌍 Select your country</option>
-        {COUNTRIES.map(c => (
-          <option key={c.code} value={c.code}>{c.label}</option>
-        ))}
-      </select>
-
-      {/* ── State / province picker — only shown once a country is chosen ── */}
-      {country && needState && (
-        <select
-          className="ub-input no-ico"
-          value={region}
-          onChange={e => { setRegion(e.target.value); setErr('') }}
-          style={selectStyle(region)}
-        >
-          <option value="" disabled>📍 Select state / province</option>
-          {regions.map(r => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      )}
-
       {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>📨 Send Verification Code →</PrimaryBtn>
     </form>
@@ -459,7 +319,7 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
 }
 
 /* ── Step: OTP ── */
-function StepOtp({ email, name, isRet, devOtp, onVerified, onBack }) {
+function StepOtp({ email, name, isRet, onVerified, onBack }) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -524,19 +384,6 @@ function StepOtp({ email, name, isRet, devOtp, onVerified, onBack }) {
       <p style={{ fontSize: 14, color: 'var(--t2)', textAlign: 'center', lineHeight: 1.6 }}>
         Code sent to <strong style={{ color: 'var(--t1)' }}>{email}</strong>
       </p>
-      {devOtp && (
-        <div style={{
-          background: 'rgba(108,99,255,0.15)', border: '1.5px dashed var(--accent)',
-          borderRadius: 'var(--r-md)', padding: '10px 18px', textAlign: 'center',
-        }}>
-          <p style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 4, letterSpacing: 1 }}>
-            🧪 TEST MODE — YOUR OTP
-          </p>
-          <p style={{ fontSize: 28, fontWeight: 800, letterSpacing: 10, color: 'var(--t1)' }}>
-            {devOtp}
-          </p>
-        </div>
-      )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }} onPaste={paste}>
         {otp.map((d, i) => (
           <input

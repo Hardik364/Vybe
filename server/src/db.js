@@ -1,15 +1,15 @@
 /**
- * db.js — Supabase database helpers
+ * db.js — PostgreSQL database helpers (Neon-compatible via pg)
  *
  * All persistent user data lives here.
  * Redis is still used for ephemeral stuff (queues, sessions, rate-limits).
  */
-import supabase from './supabaseClient.js'
+import pool from './supabaseClient.js'
 
-// Guard — if Supabase not configured, operations are no-ops
+// Guard — if DB not configured, operations are no-ops
 function guard(label) {
-    if (!supabase) {
-        console.warn(`[DB] ${label} skipped — Supabase not configured`)
+    if (!pool) {
+        console.warn(`[DB] ${label} skipped — DATABASE_URL not configured`)
         return true
     }
     return false
@@ -22,13 +22,16 @@ function guard(label) {
  */
 export async function getUser(email) {
     if (guard('getUser')) return null
-    const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single()
-    if (error && error.code !== 'PGRST116') console.error('[DB] getUser:', error.message)
-    return data || null
+    try {
+        const { rows } = await pool.query(
+            'SELECT * FROM users WHERE email = $1 LIMIT 1',
+            [email]
+        )
+        return rows[0] || null
+    } catch (err) {
+        console.error('[DB] getUser:', err.message)
+        return null
+    }
 }
 
 /**
@@ -37,25 +40,24 @@ export async function getUser(email) {
  */
 export async function upsertUser({ email, username, collegeDomain, state = null, gender = null }) {
     if (guard('upsertUser')) return null
-
-    const payload = {
-        email,
-        username,
-        college_domain: collegeDomain,
-        last_seen_at:   new Date().toISOString(),
+    try {
+        const { rows } = await pool.query(
+            `INSERT INTO users (email, username, college_domain, last_seen_at, city, gender)
+             VALUES ($1, $2, $3, NOW(), $4, $5)
+             ON CONFLICT (email) DO UPDATE SET
+               username        = COALESCE(EXCLUDED.username, users.username),
+               college_domain  = COALESCE(EXCLUDED.college_domain, users.college_domain),
+               last_seen_at    = NOW(),
+               city            = COALESCE(EXCLUDED.city, users.city),
+               gender          = COALESCE(EXCLUDED.gender, users.gender)
+             RETURNING *`,
+            [email, username, collegeDomain, state || null, gender || null]
+        )
+        return rows[0] || null
+    } catch (err) {
+        console.error('[DB] upsertUser:', err.message)
+        return null
     }
-    // Only set city/state if supplied (new signups only — returning logins skip this)
-    if (state)  payload.city   = state
-    // Only set gender on first signup — update-gender endpoint handles changes
-    if (gender) payload.gender = gender
-
-    const { data, error } = await supabase
-        .from('users')
-        .upsert(payload, { onConflict: 'email', ignoreDuplicates: false })
-        .select()
-        .single()
-    if (error) console.error('[DB] upsertUser:', error.message)
-    return data || null
 }
 
 /**
@@ -63,10 +65,14 @@ export async function upsertUser({ email, username, collegeDomain, state = null,
  */
 export async function touchUser(email) {
     if (guard('touchUser') || !email) return
-    await supabase
-        .from('users')
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq('email', email)
+    try {
+        await pool.query(
+            'UPDATE users SET last_seen_at = NOW() WHERE email = $1',
+            [email]
+        )
+    } catch (err) {
+        console.error('[DB] touchUser:', err.message)
+    }
 }
 
 /**
@@ -74,9 +80,14 @@ export async function touchUser(email) {
  */
 export async function setAbcStatus(email, status, hash = null) {
     if (guard('setAbcStatus')) return
-    const update = { abc_status: status }
-    if (hash) update.abc_hash = hash
-    await supabase.from('users').update(update).eq('email', email)
+    try {
+        await pool.query(
+            'UPDATE users SET abc_status = $1, abc_hash = COALESCE($2, abc_hash) WHERE email = $3',
+            [status, hash, email]
+        )
+    } catch (err) {
+        console.error('[DB] setAbcStatus:', err.message)
+    }
 }
 
 /**
@@ -85,10 +96,14 @@ export async function setAbcStatus(email, status, hash = null) {
  */
 export async function setUserTier(email, tier, expiresAt = null) {
     if (guard('setUserTier')) return
-    await supabase
-        .from('users')
-        .update({ tier, tier_expires_at: expiresAt })
-        .eq('email', email)
+    try {
+        await pool.query(
+            'UPDATE users SET tier = $1, tier_expires_at = $2 WHERE email = $3',
+            [tier, expiresAt, email]
+        )
+    } catch (err) {
+        console.error('[DB] setUserTier:', err.message)
+    }
 }
 
 /**
@@ -96,10 +111,15 @@ export async function setUserTier(email, tier, expiresAt = null) {
  */
 export async function banUser(email, { shadowBan = false } = {}) {
     if (guard('banUser')) return
-    const update = shadowBan
-        ? { is_shadow_banned: true }
-        : { is_banned: true }
-    await supabase.from('users').update(update).eq('email', email)
+    try {
+        if (shadowBan) {
+            await pool.query('UPDATE users SET is_shadow_banned = TRUE WHERE email = $1', [email])
+        } else {
+            await pool.query('UPDATE users SET is_banned = TRUE WHERE email = $1', [email])
+        }
+    } catch (err) {
+        console.error('[DB] banUser:', err.message)
+    }
 }
 
 // ── Karma ─────────────────────────────────────────────────────
@@ -110,37 +130,31 @@ export async function banUser(email, { shadowBan = false } = {}) {
  */
 export async function recordKarma(ratedEmail, rating, raterEmail = null) {
     if (guard('recordKarma')) return
+    const VALID = ['great', 'okay', 'disrespectful']
+    if (!VALID.includes(rating)) return
     try {
-        // Log the individual event
-        await supabase.from('karma_events').insert({
-            rated_email: ratedEmail,
-            rater_email: raterEmail,
-            rating,
-        })
+        await pool.query(
+            'INSERT INTO karma_events (rated_email, rater_email, rating) VALUES ($1, $2, $3)',
+            [ratedEmail, raterEmail, rating]
+        )
 
-        // Upsert aggregate row
-        const { data: existing } = await supabase
-            .from('karma')
-            .select('*')
-            .eq('email', ratedEmail)
-            .single()
-
-        if (existing) {
-            await supabase
-                .from('karma')
-                .update({
-                    [rating]: existing[rating] + 1,
-                    total: existing.total + 1,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('email', ratedEmail)
-        } else {
-            await supabase.from('karma').insert({
-                email: ratedEmail,
-                [rating]: 1,
-                total: 1,
-            })
-        }
+        // Upsert aggregate — increment the right column
+        await pool.query(
+            `INSERT INTO karma (email, great, okay, disrespectful, total)
+             VALUES ($1, $2, $3, $4, 1)
+             ON CONFLICT (email) DO UPDATE SET
+               great          = karma.great          + EXCLUDED.great,
+               okay           = karma.okay           + EXCLUDED.okay,
+               disrespectful  = karma.disrespectful  + EXCLUDED.disrespectful,
+               total          = karma.total          + 1,
+               updated_at     = NOW()`,
+            [
+                ratedEmail,
+                rating === 'great' ? 1 : 0,
+                rating === 'okay' ? 1 : 0,
+                rating === 'disrespectful' ? 1 : 0,
+            ]
+        )
     } catch (err) {
         console.error('[DB] recordKarma:', err.message)
     }
@@ -151,12 +165,16 @@ export async function recordKarma(ratedEmail, rating, raterEmail = null) {
  */
 export async function getKarma(email) {
     if (guard('getKarma')) return { great: 0, okay: 0, disrespectful: 0, total: 0 }
-    const { data } = await supabase
-        .from('karma')
-        .select('*')
-        .eq('email', email)
-        .single()
-    return data || { great: 0, okay: 0, disrespectful: 0, total: 0 }
+    try {
+        const { rows } = await pool.query(
+            'SELECT * FROM karma WHERE email = $1 LIMIT 1',
+            [email]
+        )
+        return rows[0] || { great: 0, okay: 0, disrespectful: 0, total: 0 }
+    } catch (err) {
+        console.error('[DB] getKarma:', err.message)
+        return { great: 0, okay: 0, disrespectful: 0, total: 0 }
+    }
 }
 
 /**
@@ -178,20 +196,17 @@ export async function shouldShadowBan(email) {
 export async function fileReport(reportedEmail, reporterEmail = null, reason = null) {
     if (guard('fileReport')) return 0
     try {
-        await supabase.from('reports').insert({
-            reported_email: reportedEmail,
-            reporter_email: reporterEmail,
-            reason,
-        })
-
-        // Count unique reporters
-        const { count } = await supabase
-            .from('reports')
-            .select('reporter_email', { count: 'exact', head: true })
-            .eq('reported_email', reportedEmail)
-            .not('reporter_email', 'is', null)
-
-        return count || 0
+        await pool.query(
+            'INSERT INTO reports (reported_email, reporter_email, reason) VALUES ($1, $2, $3)',
+            [reportedEmail, reporterEmail, reason]
+        )
+        const { rows } = await pool.query(
+            `SELECT COUNT(DISTINCT reporter_email) AS cnt
+             FROM reports
+             WHERE reported_email = $1 AND reporter_email IS NOT NULL`,
+            [reportedEmail]
+        )
+        return parseInt(rows[0]?.cnt || '0', 10)
     } catch (err) {
         console.error('[DB] fileReport:', err.message)
         return 0
@@ -205,19 +220,18 @@ export async function fileReport(reportedEmail, reporterEmail = null, reason = n
  */
 export async function createSubscription({ email, plan, amountPaise, razorpayOrderId }) {
     if (guard('createSubscription')) return null
-    const { data, error } = await supabase
-        .from('subscriptions')
-        .insert({
-            email,
-            plan,
-            amount_paise: amountPaise,
-            razorpay_order_id: razorpayOrderId,
-            status: 'pending',
-        })
-        .select()
-        .single()
-    if (error) console.error('[DB] createSubscription:', error.message)
-    return data
+    try {
+        const { rows } = await pool.query(
+            `INSERT INTO subscriptions (email, plan, amount_paise, razorpay_order_id, status)
+             VALUES ($1, $2, $3, $4, 'pending')
+             RETURNING *`,
+            [email, plan, amountPaise, razorpayOrderId]
+        )
+        return rows[0] || null
+    } catch (err) {
+        console.error('[DB] createSubscription:', err.message)
+        return null
+    }
 }
 
 /**
@@ -225,13 +239,15 @@ export async function createSubscription({ email, plan, amountPaise, razorpayOrd
  */
 export async function activateSubscription(razorpayOrderId, razorpayPaymentId, expiresAt) {
     if (guard('activateSubscription')) return
-    await supabase
-        .from('subscriptions')
-        .update({
-            razorpay_payment_id: razorpayPaymentId,
-            status: 'active',
-            starts_at: new Date().toISOString(),
-            expires_at: expiresAt,
-        })
-        .eq('razorpay_order_id', razorpayOrderId)
+    try {
+        await pool.query(
+            `UPDATE subscriptions
+             SET razorpay_payment_id = $1, status = 'active',
+                 starts_at = NOW(), expires_at = $2
+             WHERE razorpay_order_id = $3`,
+            [razorpayPaymentId, expiresAt, razorpayOrderId]
+        )
+    } catch (err) {
+        console.error('[DB] activateSubscription:', err.message)
+    }
 }

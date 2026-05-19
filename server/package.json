@@ -13,7 +13,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.3",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -24,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^8.0.5",
     "nodemon": "^3.1.4",
+    "pg": "^8.21.0",
     "razorpay": "^2.9.6",
     "redis": "^4.6.14",
     "resend": "^6.12.2",

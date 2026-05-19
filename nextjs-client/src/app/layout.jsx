@@ -1,9 +1,16 @@
 import './globals.css'
 import BgCanvas from '@/components/BgCanvas'
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export const metadata = {
-  title: 'UniBuddy — Real conversations. Your college.',
-  description: 'Match with college students for real video conversations.',
+  title: 'Vybe — Connect with strangers who get it.',
+  description: 'Match with people for real voice conversations. Open to everyone.',
 }
 
 export default function RootLayout({ children }) {

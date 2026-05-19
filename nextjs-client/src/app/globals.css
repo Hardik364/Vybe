@@ -624,3 +624,112 @@
   padding: 14px 20px; display: flex; align-items: center; gap: 12px;
   animation: float 4s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — TABLET (≤ 1024px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  /* Signup: shrink hero */
+  .signup-hero { padding: 36px 32px; }
+  .hero-title  { font-size: clamp(32px, 4vw, 52px); }
+  .hero-cards  { display: none; }
+
+  /* Signup: shrink form panel */
+  .signup-form-panel { width: 380px; padding: 40px 32px; }
+
+  /* Chat: shrink video panel */
+  .video-panel { width: 32%; min-width: 220px; }
+
+  /* Account: shrink left col */
+  .acc-left { width: 340px; min-width: 300px; }
+
+  /* Upgrade: 2-col tier grid */
+  .up-tiers { grid-template-columns: repeat(2, 1fr); }
+
+  /* Community sidebar */
+  .cm-side { width: 200px; min-width: 200px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 768px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ── Signup ── */
+  .screen-signup    { flex-direction: column; }
+  .signup-hero      { display: none; }          /* hide hero on small screens */
+  .signup-form-panel {
+    width: 100%; border-left: none; border-top: 1px solid var(--border);
+    padding: 32px 24px; justify-content: flex-start;
+    min-height: 100dvh;
+  }
+
+  /* ── Navbar ── */
+  .navbar { padding: 0 12px; gap: 8px; }
+  .nav-logo span:last-child { display: none; }  /* hide text, keep mark */
+  .stranger-chip { padding: 6px 10px 6px 8px; font-size: 13px; }
+  .live-badge    { font-size: 11px; padding: 3px 8px; }
+  /* hide label text in nav pills on mobile, keep icons */
+  .nav-pill-label { display: none; }
+
+  /* ── Chat layout: stack video above chat ── */
+  .chat-layout {
+    flex-direction: column;
+    padding: 8px; gap: 8px;
+    overflow-y: auto;
+  }
+  .video-panel {
+    width: 100%; min-width: unset;
+    height: 240px; flex-shrink: 0;
+    flex-direction: row;    /* two video slots side-by-side */
+  }
+  .video-slot { min-height: unset; height: 100%; }
+
+  /* ── Message panel ── */
+  .msg-panel  { min-height: 320px; flex: 1; }
+  .bubble     { max-width: 88%; font-size: 13px; }
+
+  /* ── Post-call modal ── */
+  .modal-card { padding: 28px 20px; border-radius: var(--r-lg); }
+
+  /* ── Upgrade modal: 1-col ── */
+  .up-modal  { padding: 24px 18px; border-radius: var(--r-lg); }
+  .up-tiers  { grid-template-columns: 1fr; }
+
+  /* ── Account page: single column ── */
+  .acc-left {
+    width: 100%; min-width: unset;
+    border-right: none; border-bottom: 1px solid var(--border);
+    max-height: 55dvh; overflow-y: auto;
+  }
+  .acc-right { min-height: 300px; }
+
+  /* ── Community sidebar: hidden (slide-in handled by JS) ── */
+  .cm-side {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 280px; z-index: 200;
+    transform: translateX(-100%);
+    transition: transform var(--t-base);
+    box-shadow: var(--sh-lg);
+  }
+  .cm-side.open { transform: translateX(0); }
+
+  /* ── OTP boxes: slightly smaller ── */
+  .otp-box { width: 42px; height: 50px; font-size: 20px; }
+
+  /* ── Karma sheet ── */
+  .karma-sheet { padding: 24px 16px 40px; }
+  .karma-btns  { gap: 8px; }
+  .karma-btn   { padding: 14px 6px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — SMALL MOBILE (≤ 400px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .signup-form-panel { padding: 24px 16px; }
+  .form-heading      { font-size: 22px; }
+  .video-panel       { height: 190px; }
+  .otp-box           { width: 36px; height: 44px; font-size: 18px; }
+  .modal-card        { padding: 22px 14px; }
+  .up-modal          { padding: 18px 12px; }
+}

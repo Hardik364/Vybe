@@ -7,7 +7,8 @@ const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
 export default function useSocket(
   username, remoteVideoRef, setMessage, updateUser, peerConnection, setPeerConnection, setStrangerData,
-  genderPref
+  genderPref,
+  inModal   // ← true while PostCallScreen or KarmaModal is visible
 ) {
   const [socket, setSocket] = useState(null)
   const [strangerUserId, setStrangerUserId] = useState('')
@@ -21,13 +22,16 @@ export default function useSocket(
   const strangerUserIdRef   = useRef('')
   const strangerUsernameRef = useRef(null)
   const socketRef           = useRef(null)
-  // peerConnection comes in as a prop — mirror it into a ref so clearState
-  // always closes the *current* RTCPeerConnection, not the one from mount.
   const peerConnectionRef   = useRef(null)
+  // When a modal (PostCallScreen / KarmaModal) is open we MUST NOT:
+  //   • call clearState() from strangerLeftTheChat  (would re-queue too early)
+  //   • fire auto-start startConnection             (same reason)
+  const inModalRef          = useRef(false)
 
   useEffect(() => { strangerUserIdRef.current  = strangerUserId  }, [strangerUserId])
   useEffect(() => { strangerUsernameRef.current = strangerUsername }, [strangerUsername])
   useEffect(() => { peerConnectionRef.current  = peerConnection  }, [peerConnection])
+  useEffect(() => { inModalRef.current         = inModal         }, [inModal])
 
   // ── Socket creation ───────────────────────────────────────────────
   useEffect(() => {
@@ -51,10 +55,8 @@ export default function useSocket(
     socketRef.current = newSocket
 
     newSocket.on('guestLimitReached', () => {
-      // Socket is still alive — notify partner before leaving
       const partnerId = strangerUserIdRef.current
       if (partnerId) newSocket.emit('pairedUserLeftTheChat', partnerId)
-
       localStorage.removeItem('ub_token')
       localStorage.removeItem('ub_username')
       localStorage.removeItem('ub_guest')
@@ -69,14 +71,13 @@ export default function useSocket(
     }
   }, [username])
 
-  // ── Auto-start: THE SOLE source of startConnection emits. ────────
-  // Fires when: (1) socket first created, (2) strangerUsername → null
-  // (which happens every time clearState() is called after a call ends).
-  // By removing explicit startConnection emits from strangerLeftTheChat
-  // and updateUser, we guarantee at most ONE emit per call-end, so the
-  // rate-limit of 3/3s is never approached in normal usage.
+  // ── Auto-start: emit startConnection when idle (no partner, no modal).
+  //   CRITICAL: guard with inModalRef so a strangerLeftTheChat that fires
+  //   while PostCallScreen/KarmaModal is open doesn't re-queue prematurely.
   useEffect(() => {
-    if (socket && !strangerUsername) socket.emit('startConnection')
+    if (socket && !strangerUsername && !inModalRef.current) {
+      socket.emit('startConnection')
+    }
   }, [socket, strangerUsername])
 
   // ── Core socket events ────────────────────────────────────────────
@@ -90,16 +91,19 @@ export default function useSocket(
       setConnectionStatus(true)
     })
 
-    // strangerLeftTheChat: clear state ONLY — auto-start effect handles re-queue.
-    // Do NOT emit startConnection here: that would double-emit alongside the
-    // auto-start effect, wasting a rate-limit slot and risking the 3/3s cap.
+    // strangerLeftTheChat:
+    //   • If no modal is open → clear state immediately (auto-start re-queues).
+    //   • If a modal IS open → block clearState here; PostCallScreen's own
+    //     listener calls safeMoveOn() which closes the modal chain, and
+    //     clearState is called by the updateUser effect after KarmaModal.
     socket.on('strangerLeftTheChat', () => {
-      clearState()
+      if (!inModalRef.current) {
+        clearState()
+      }
+      // When inModal=true, PostCallScreen handles it via safeMoveOn()
     })
 
     socket.on('errMakingPair', () => {
-      // Server failed to pair us (Redis error, ghost match, etc.).
-      // Brief delay so we don't spam if the error is persistent.
       setTimeout(() => socketRef.current?.emit('startConnection'), 800)
     })
 
@@ -120,8 +124,6 @@ export default function useSocket(
     }
   }, [socket])
 
-  // ── clearState: uses peerConnectionRef so it always closes the ──
-  //   current RTCPeerConnection, not a stale closure value.
   function clearState() {
     setStrangerData(null)
     setStrangerUserId('')
@@ -134,19 +136,17 @@ export default function useSocket(
     setPeerConnection(setPcInstance())
   }
 
-  // ── updateUser (Next button): notify partner + clear state. ──────
-  // Re-queue is handled by the auto-start effect (strangerUsername → null).
+  // ── updateUser (called after KarmaModal is done, or Next while not in call).
+  //   clearState() here sets strangerUsername → null → auto-start re-queues.
+  //   We do NOT emit pairedUserLeftTheChat here — that was already sent by
+  //   handleNewUser the moment the user clicked Next (before PostCallScreen).
   useEffect(() => {
     if (updateUser > 0) {
-      const prevId = strangerUserIdRef.current
-      const sock   = socketRef.current
       clearState()
-      if (prevId && sock) sock.emit('pairedUserLeftTheChat', prevId)
-      // NO explicit startConnection here — auto-start fires from strangerUsername→null
     }
   }, [updateUser])
 
-  // ── Beforeunload: registered once per socket, refs keep values current ─
+  // ── Beforeunload: best-effort notification so partner isn't frozen ──
   useEffect(() => {
     if (!socket) return
     const handler = () => {

@@ -256,7 +256,11 @@ export async function handelSocketConnection(io, socket) {
     })
 
     socket.on('moveOn', ({ to }) => {
-        if (!werePartnered(socket.id, to)) return
+        // Allow moveOn even if partnership record has been cleaned up —
+        // the worst case is a spurious partnerMovedOn to a re-queued socket,
+        // which is handled client-side by the safeMoveOn guard (movedOnRef).
+        // Being too strict here causes PostCallScreen to silently get stuck.
+        if (!to) return
         if (pendingConnects.has(socket.id)) {
             clearTimeout(pendingConnects.get(socket.id).timer)
             pendingConnects.delete(socket.id)
@@ -506,9 +510,10 @@ export async function handelSocketConnection(io, socket) {
 
             // Grace period before wiping partnership record so the partner
             // can still submit a rating/report during the post-call window.
-            // 35 s = PostCallScreen 30 s timer + 5 s buffer, ensuring moveOn
-            // events are never silently dropped before the record is cleaned up.
-            setTimeout(() => cleanupPartnership(socket.id), 35_000)
+            // 65 s = PostCallScreen 30 s + KarmaModal up to ~30 s + 5 s buffer.
+            // Ensures moveOn / rateUser / reportUser events from PostCallScreen
+            // and KarmaModal are never silently dropped by werePartnered().
+            setTimeout(() => cleanupPartnership(socket.id), 65_000)
             cleanupRateLimit(socket.id)
             removeUser(socket.id)
             emitGenderStats(io)

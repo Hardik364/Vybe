@@ -92,9 +92,13 @@ export default function ChatPage() {
   const remoteVideoRef = useRef(null)
   const signalingRef   = useRef(null)
 
+  // inModal = true while PostCallScreen or KarmaModal is open.
+  // Passed to useSocket so it blocks premature re-queue from strangerLeftTheChat.
+  const inModal = showPostCall || showKarma
+
   const { socket, strangerUserId, strangerUsername, connectionStatus, genderStats } = useSocket(
     username, remoteVideoRef, setMessage, updateUser, peerConnection, setPeerConnection, setStrangerData,
-    genderPref
+    genderPref, inModal
   )
   usePeerConnection(setPeerConnection)
 
@@ -154,8 +158,18 @@ export default function ChatPage() {
     socket.emit('dismissPrompt', { to: strangerUserId })
   }
   function handleNewUser() {
-    if (connectionStatus) { setLastStrangerId(strangerUserId); setShowPostCall(true) }
-    else setUpdateUser(p => p + 1)
+    if (connectionStatus) {
+      // 1. Tell partner immediately — don't leave them hanging for 30s
+      if (socket && strangerUserId) socket.emit('pairedUserLeftTheChat', strangerUserId)
+      // 2. Close the peer connection so audio/video stops right away
+      if (peerConnection?.signalingState !== 'closed') peerConnection?.close()
+      // 3. Show PostCallScreen (strangerUserId/Username still set — needed for Connect btn)
+      setLastStrangerId(strangerUserId)
+      setShowPostCall(true)
+    } else {
+      // Not in a call — just re-queue (server cleans up queue entry via soloUserLeftTheChat)
+      setUpdateUser(p => p + 1)
+    }
   }
   function handleConnect() { setShowPostCall(false); setShowKarma(true) }
   function handleMoveOn()  { setShowPostCall(false); setShowKarma(true) }
@@ -176,7 +190,11 @@ export default function ChatPage() {
   }
 
   function handleKarmaRate() {
-    setShowKarma(false); setActivePrompt(null); setLastStrangerId(null)
+    // Close KarmaModal first (sets inModal → false), then trigger clearState + re-queue.
+    // The order matters: inModal must be false before updateUser fires the auto-start.
+    setShowKarma(false)
+    setActivePrompt(null)
+    setLastStrangerId(null)
     setUpdateUser(p => p + 1)
   }
   function handleReport() {

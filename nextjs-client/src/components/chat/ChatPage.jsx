@@ -13,6 +13,7 @@ import PostCallScreen from '@/components/modals/PostCallScreen'
 import KarmaModal from '@/components/modals/KarmaModal'
 import AccountDrawer from '@/components/account/AccountDrawer'
 import useSocket from '@/hooks/useSocket'
+import useIsMobile from '@/hooks/useIsMobile'
 import usePeerConnection from '@/hooks/usePeerConnection'
 import { initIceServers } from '@/utils/pcInstance'
 import webrtcSignaling from '@/utils/webrtcSignaling'
@@ -80,6 +81,8 @@ export default function ChatPage() {
   const [collegeDomain, setCollegeDomain]   = useState('launch')
   const [reportSent, setReportSent]         = useState(false)
   const [showAccount, setShowAccount]       = useState(false)
+  const [videoCollapsed, setVideoCollapsed] = useState(false)
+  const isMobile = useIsMobile(768)
   const [genderPref, setGenderPref]         = useState(() => {
     if (typeof window === 'undefined') return 'anyone'
     return localStorage.getItem('ub_gender_pref') || 'anyone'
@@ -201,8 +204,24 @@ export default function ChatPage() {
       />
 
       <div className="chat-layout">
-        {/* Video panel — 38% */}
-        <div className="video-panel">
+        {/* Mobile video toggle */}
+        {isMobile && (
+          <button
+            onClick={() => setVideoCollapsed(v => !v)}
+            style={{
+              position: 'absolute', top: 66, right: 12, zIndex: 10,
+              background: 'var(--bg-surf)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-full)', padding: '4px 10px',
+              fontSize: 11, fontWeight: 700, color: 'var(--t3)',
+              cursor: 'pointer', boxShadow: 'var(--sh-sm)',
+            }}
+          >
+            {videoCollapsed ? '📹 Show Video' : '🙈 Hide Video'}
+          </button>
+        )}
+
+        {/* Video panel */}
+        <div className="video-panel" style={isMobile && videoCollapsed ? { display: 'none' } : {}}>
           <ChangeCam
             peerConnection={peerConnection}
             localVideoRef={localVideoRef}

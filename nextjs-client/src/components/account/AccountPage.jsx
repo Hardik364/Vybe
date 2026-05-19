@@ -2,12 +2,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
+import useIsMobile from '@/hooks/useIsMobile'
 
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
 export default function AccountPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
+  const isMobile = useIsMobile(768)
 
   useEffect(() => {
     const token = localStorage.getItem('ub_token')
@@ -51,7 +53,7 @@ export default function AccountPage() {
       </nav>
 
       {/* Split body */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
         {/* Left column — cards */}
         <div className="acc-left">
           {/* Profile card */}

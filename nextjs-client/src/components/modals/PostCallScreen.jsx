@@ -1,7 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
-
-const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
+import { useState, useEffect, useRef } from 'react'
 
 export default function PostCallScreen({ strangerUsername, strangerUserId, socket, onConnect, onMoveOn }) {
   const [myPressed,   setMyPressed]   = useState(false)
@@ -11,25 +9,51 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
   const [contactVal,  setContactVal]  = useState('')
   const [exchanged,   setExchanged]   = useState(null)
 
-  // Countdown
+  // Ref mirrors — let socket listeners see current values without stale closure.
+  const exchangedRef  = useRef(null)
+  const movedOnRef    = useRef(false)   // "called once" guard for onMoveOn
+
+  // Single entry-point for moving on — prevents double-calls from
+  // countdown, partnerMovedOn, and connectExpired racing each other.
+  function safeMoveOn() {
+    if (movedOnRef.current) return
+    movedOnRef.current = true
+    onMoveOn()
+  }
+
+  // Countdown — also emits moveOn to partner so they don't wait the full
+  // server-side 31-second connectExpired timer alone.
   useEffect(() => {
-    if (timer <= 0) { onMoveOn(); return }
+    if (timer <= 0) {
+      if (socket && strangerUserId) socket.emit('moveOn', { to: strangerUserId })
+      safeMoveOn()
+      return
+    }
     const t = setTimeout(() => setTimer(p => p - 1), 1000)
     return () => clearTimeout(t)
   }, [timer])
 
-  // Listen for mutual connect / partner actions
+  // Listen for mutual connect / partner actions.
+  // Uses exchangedRef (not state) inside connectExpired handler to avoid
+  // stale-closure race where the event fires in the same tick as state update.
   useEffect(() => {
     if (!socket) return
-    socket.on('partnerConnect',   () => setTheyPressed(true))
-    socket.on('contactsExchanged', data => setExchanged(data || {}))
-    socket.on('connectExpired',   () => { if (!exchanged) onMoveOn() })
-    socket.on('partnerMovedOn',   () => onMoveOn())
+    socket.on('partnerConnect',      () => setTheyPressed(true))
+    socket.on('contactsExchanged',   data => {
+      exchangedRef.current = data || {}
+      setExchanged(data || {})
+    })
+    socket.on('connectExpired',      () => { if (!exchangedRef.current) safeMoveOn() })
+    socket.on('partnerMovedOn',      () => safeMoveOn())
+    // BUG 5: if stranger disconnects while PostCallScreen is open,
+    // we're already re-queued server-side — dismiss the screen immediately.
+    socket.on('strangerLeftTheChat', () => safeMoveOn())
     return () => {
       socket.off('partnerConnect')
       socket.off('contactsExchanged')
       socket.off('connectExpired')
       socket.off('partnerMovedOn')
+      socket.off('strangerLeftTheChat')
     }
   }, [socket])
 
@@ -165,7 +189,7 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
           </button>
           <button onClick={() => {
             if (socket && strangerUserId) socket.emit('moveOn', { to: strangerUserId })
-            onMoveOn()
+            safeMoveOn()
           }} className="btn-moveon">
             <span>👋 Move On</span>
             <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.6 }}>Gone forever</span>

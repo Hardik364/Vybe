@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
   const [hasStream, setHasStream] = useState(false)
 
+  // Reset the placeholder whenever the peer connection is replaced
+  // (which happens after every "Next" — clearState() creates a new PC).
+  useEffect(() => {
+    setHasStream(false)
+  }, [peerConnection])
+
   useEffect(() => {
     if (!peerConnection) return
     peerConnection.ontrack = (event) => {
@@ -12,6 +18,8 @@ export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
         setHasStream(true)
       }
     }
+    // Cleanup: null the handler so it doesn't fire on the stale PC instance.
+    return () => { peerConnection.ontrack = null }
   }, [peerConnection])
 
   return (

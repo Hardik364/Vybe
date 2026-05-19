@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { OAuth2Client } from 'google-auth-library'
 import client from './redisClient.js'
 import { sendOtpEmail } from './utils/emailService.js'
 import { upsertUser, setAbcStatus, setUserTier } from './db.js'
@@ -16,32 +17,34 @@ const { patterns, known } = JSON.parse(
     readFileSync(join(__dirname, 'data/collegeDomains.json'), 'utf8')
 )
 
+const VALID_GENDERS = new Set(['male', 'female', 'transgender', 'unspecified'])
+
 // ── Helpers ──────────────────────────────────────────────────
 
+// Cryptographically secure OTP — Math.random() is NOT safe
 function generateOtp() {
-    return Math.floor(100000 + Math.random() * 900000).toString()
+    return crypto.randomInt(100000, 1000000).toString()
 }
 
-function isCollegeEmail(email) {
-    // Skip validation in local dev
-    if (process.env.NODE_ENV !== 'production') return true
-
+// Returns the college domain if the email belongs to a known college,
+// otherwise 'global'. Used to scope matching queues — open to all,
+// but college students still get their college-scoped experience.
+function getCollegeDomain(email) {
     const domain = email.split('@')[1]?.toLowerCase()
-    if (!domain) return false
-
-    // Check exact known domains
-    if (known.includes(domain)) return true
-
-    // Check suffix patterns (.ac.in, .edu.in, etc.)
-    return patterns.some(p => domain.endsWith(p))
+    if (!domain) return 'global'
+    if (known.includes(domain)) return domain
+    const parts = domain.split('.')
+    if (parts.length >= 3 && patterns.some(p => domain.endsWith(p))) return domain
+    return 'global'
 }
 
 // ── POST /auth/send-otp ───────────────────────────────────────
-// Body: { email, username? }
-// For returning users, username is optional — we look it up from Redis.
+// Body: { email, username?, gender?, state? }
+// Open to all email addresses — not restricted to college domains.
+// For returning users, username and gender are optional (already stored).
 router.post('/send-otp', async (req, res) => {
     try {
-        const { email, username, state } = req.body
+        const { email, username, gender, state } = req.body
         if (!email) {
             return res.status(400).json({ error: 'Email is required' })
         }
@@ -50,12 +53,6 @@ router.post('/send-otp', async (req, res) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(emailLower)) {
             return res.status(400).json({ error: 'Invalid email address' })
-        }
-
-        if (!isCollegeEmail(emailLower)) {
-            return res.status(400).json({
-                error: 'Please use your college email (.ac.in, .edu, etc.)'
-            })
         }
 
         // Check if this is a returning user (username already pinned to email)
@@ -76,8 +73,16 @@ router.post('/send-otp', async (req, res) => {
 
         const otp = generateOtp()
 
-        // Store OTP with resolved username (and state for new signups)
-        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({ otp, username: resolvedName, state: state || null }))
+        // Validate and store gender (new signups only)
+        const resolvedGender = VALID_GENDERS.has(gender) ? gender : 'unspecified'
+
+        // Store OTP with resolved username, gender (and state for new signups)
+        await client.setEx(`otp:${emailLower}`, 600, JSON.stringify({
+            otp,
+            username: resolvedName,
+            gender:   resolvedGender,
+            state:    state || null,
+        }))
 
         // Increment attempt counter (expires in 10min)
         await client.incr(`otp-attempts:${emailLower}`)
@@ -113,33 +118,52 @@ router.post('/verify-otp', async (req, res) => {
         }
 
         const emailLower = email.toLowerCase().trim()
+
+        // ── Per-email verify attempt rate limit ───────────────
+        // Max 5 attempts before OTP is invalidated (prevents brute-force of 6-digit codes)
+        const verifyAttempts = await client.incr(`otp-verify-attempts:${emailLower}`)
+        await client.expire(`otp-verify-attempts:${emailLower}`, 600)
+        if (verifyAttempts > 5) {
+            await client.del(`otp:${emailLower}`)   // invalidate OTP — force re-request
+            await client.del(`otp-verify-attempts:${emailLower}`)
+            return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code.' })
+        }
+
         const stored = await client.get(`otp:${emailLower}`)
 
         if (!stored) {
             return res.status(400).json({ error: 'OTP expired or not found. Request a new one.' })
         }
 
-        const { otp: correctOtp, username, state } = JSON.parse(stored)
+        const { otp: correctOtp, username, gender: otpGender, state } = JSON.parse(stored)
 
         if (otp.trim() !== correctOtp) {
             return res.status(400).json({ error: 'Incorrect OTP. Try again.' })
         }
 
-        // OTP verified — delete it so it can't be reused
+        // OTP verified — delete it + attempt counters so they can't be reused
         await client.del(`otp:${emailLower}`)
         await client.del(`otp-attempts:${emailLower}`)
+        await client.del(`otp-verify-attempts:${emailLower}`)
 
         // ── Pin username to email (first login wins) ──────────
         // If this email already has a saved username, use that one.
         // This prevents the same person from getting a different username
         // on every login and being matched with themselves.
-        const collegeDomain   = emailLower.split('@')[1]
+        const collegeDomain   = getCollegeDomain(emailLower)
         const savedUsername   = await client.get(`user:username:${emailLower}`)
         const finalUsername   = savedUsername || username
 
         if (!savedUsername) {
             // First time this email has verified — lock in the username
             await client.set(`user:username:${emailLower}`, username)
+        }
+
+        // ── Persist gender (first signup only — can only be changed via update-gender) ──
+        const savedGender = await client.get(`user:gender:${emailLower}`)
+        const finalGender = savedGender || otpGender || 'unspecified'
+        if (!savedGender && otpGender) {
+            await client.set(`user:gender:${emailLower}`, otpGender)
         }
 
         // ── Cache state in Redis so socket layer can find it fast ────────────
@@ -149,7 +173,7 @@ router.post('/verify-otp', async (req, res) => {
         }
 
         // ── Persist to Supabase (non-blocking — don't fail auth if DB is down) ──
-        upsertUser({ email: emailLower, username: finalUsername, collegeDomain, state })
+        upsertUser({ email: emailLower, username: finalUsername, collegeDomain, state, gender: finalGender })
             .catch(err => console.error('[Auth] Supabase upsertUser failed:', err.message))
 
         // Issue JWT (valid for 7 days)
@@ -174,12 +198,173 @@ router.get('/me', async (req, res) => {
     if (!token) return res.status(401).json({ error: 'No token' })
 
     try {
-        const user  = jwt.verify(token, process.env.JWT_SECRET)
-        const tier  = await client.get(`tier:${user.email}`) || 'free'
-        res.json({ valid: true, username: user.username, email: user.email, collegeDomain: user.collegeDomain, tier })
+        const user   = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
+        const [tier, gender, genderChanged] = await Promise.all([
+            client.get(`tier:${user.email}`),
+            client.get(`user:gender:${user.email}`),
+            client.get(`user:gender-changed:${user.email}`),
+        ])
+        res.json({
+            valid:          true,
+            username:       user.username,
+            email:          user.email,
+            collegeDomain:  user.collegeDomain,
+            tier:           tier || 'free',
+            gender:         gender || 'unspecified',
+            genderChanged:  !!genderChanged,
+        })
     } catch {
         res.status(401).json({ valid: false, error: 'Token expired or invalid' })
     }
+})
+
+// ── POST /auth/update-gender ──────────────────────────────────
+// One-time gender update after signup. Guarded by a Redis flag so it
+// can only be used once — the flag is permanent (no TTL).
+router.post('/update-gender', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) return res.status(401).json({ error: 'Login required' })
+
+    let user
+    try { user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }) }
+    catch { return res.status(401).json({ error: 'Token invalid' }) }
+
+    const { gender } = req.body
+    if (!VALID_GENDERS.has(gender)) {
+        return res.status(400).json({ error: 'Invalid gender value' })
+    }
+
+    const emailLower = user.email.toLowerCase()
+
+    const alreadyChanged = await client.get(`user:gender-changed:${emailLower}`)
+    if (alreadyChanged) {
+        return res.status(403).json({ error: 'Gender can only be changed once after signup.' })
+    }
+
+    await Promise.all([
+        client.set(`user:gender:${emailLower}`, gender),
+        client.set(`user:gender-changed:${emailLower}`, '1'),
+    ])
+
+    console.log(`[Auth] Gender updated: ${emailLower} → ${gender}`)
+    res.json({ success: true, gender })
+})
+
+// ── Google OAuth2 client (lazy — only created if GOOGLE_CLIENT_ID is set) ──
+const googleOAuthClient = process.env.GOOGLE_CLIENT_ID
+    ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+    : null
+
+// ── POST /auth/google ─────────────────────────────────────────
+// Step 1: verify a Google `credential` (id_token).
+// • Returning user → issue app JWT immediately.
+// • New user       → return a short-lived nonce; client collects gender then calls /google/complete.
+router.post('/google', async (req, res) => {
+    if (!googleOAuthClient) {
+        return res.status(501).json({ error: 'Google Sign-In is not configured on this server.' })
+    }
+
+    const { credential } = req.body
+    if (!credential) return res.status(400).json({ error: 'Google credential required' })
+
+    try {
+        const ticket  = await googleOAuthClient.verifyIdToken({
+            idToken:  credential,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        })
+        const payload = ticket.getPayload()
+        const { email, name, picture } = payload
+
+        if (!email) return res.status(400).json({ error: 'No email returned from Google' })
+
+        const emailLower     = email.toLowerCase().trim()
+        const savedUsername  = await client.get(`user:username:${emailLower}`)
+
+        if (savedUsername) {
+            // ── Returning user ──────────────────────────────────────
+            const collegeDomain = getCollegeDomain(emailLower)
+            const token = jwt.sign(
+                { email: emailLower, username: savedUsername, collegeDomain },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d' }
+            )
+            console.log(`[Auth] Google sign-in: ${savedUsername} (${emailLower}) [returning]`)
+            return res.json({ success: true, token, username: savedUsername, collegeDomain })
+        }
+
+        // ── New user — store pending state, ask for gender ──────────
+        const nonce = crypto.randomBytes(20).toString('hex')
+        await client.setEx(`pending-google:${nonce}`, 300, JSON.stringify({
+            email:       emailLower,
+            displayName: name || emailLower.split('@')[0],
+            picture:     picture || null,
+        }))
+
+        console.log(`[Auth] Google new user: ${emailLower} — awaiting gender`)
+        return res.json({
+            success:     true,
+            isNew:       true,
+            nonce,
+            displayName: name || emailLower.split('@')[0],
+        })
+    } catch (err) {
+        console.error('[Auth] Google verify failed:', err.message)
+        return res.status(401).json({ error: 'Invalid or expired Google credential. Please try again.' })
+    }
+})
+
+// ── POST /auth/google/complete ────────────────────────────────
+// Step 2 (new users only): receive nonce + gender + optional username → create account, issue JWT.
+router.post('/google/complete', async (req, res) => {
+    const { nonce, gender, username: reqUsername } = req.body
+
+    if (!nonce) return res.status(400).json({ error: 'Session nonce required' })
+    if (!VALID_GENDERS.has(gender)) return res.status(400).json({ error: 'Please select a valid gender' })
+
+    const stored = await client.get(`pending-google:${nonce}`)
+    if (!stored) {
+        return res.status(400).json({ error: 'Session expired — please sign in with Google again.' })
+    }
+
+    const { email: emailLower, displayName } = JSON.parse(stored)
+
+    // Trim + sanitise username (fall back to Google display name)
+    const rawName       = (reqUsername || displayName || '').trim().replace(/<[^>]*>/g, '').slice(0, 24)
+    const finalUsername = rawName || `User${crypto.randomBytes(3).toString('hex')}`
+
+    // Race-condition guard: if account was somehow created in another tab
+    const existingUsername = await client.get(`user:username:${emailLower}`)
+    if (existingUsername) {
+        await client.del(`pending-google:${nonce}`)
+        const collegeDomain = getCollegeDomain(emailLower)
+        const token = jwt.sign(
+            { email: emailLower, username: existingUsername, collegeDomain },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        )
+        return res.json({ success: true, token, username: existingUsername, collegeDomain })
+    }
+
+    const collegeDomain = getCollegeDomain(emailLower)
+
+    await Promise.all([
+        client.set(`user:username:${emailLower}`, finalUsername),
+        client.set(`user:gender:${emailLower}`, gender),
+        client.del(`pending-google:${nonce}`),
+    ])
+
+    // Persist to Supabase (non-blocking)
+    upsertUser({ email: emailLower, username: finalUsername, collegeDomain, gender })
+        .catch(err => console.error('[Auth] Google upsertUser failed:', err.message))
+
+    const token = jwt.sign(
+        { email: emailLower, username: finalUsername, collegeDomain },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+    )
+
+    console.log(`[Auth] Google sign-in complete: ${finalUsername} (${emailLower}) [new]`)
+    res.json({ success: true, token, username: finalUsername, collegeDomain })
 })
 
 // ── POST /auth/verify-abc ─────────────────────────────────────
@@ -223,7 +408,7 @@ router.post('/verify-abc', async (req, res) => {
         res.json({ status: 'pending', message: 'Verification submitted. Approved within 24h.' })
     } catch (err) {
         console.error('[verify-abc]', err)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: 'Verification failed. Please try again.' })
     }
 })
 
@@ -252,17 +437,24 @@ router.post('/set-tier', async (req, res) => {
     if (!['free', 'plus', 'pro'].includes(tier)) {
         return res.status(400).json({ error: 'Invalid tier' })
     }
+    // Validate email format before using it as a Redis key
+    const emailLower = (email || '').toLowerCase().trim()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(emailLower)) {
+        return res.status(400).json({ error: 'Invalid email' })
+    }
     try {
         if (tier === 'free') {
-            await client.del(`tier:${email}`)
+            await client.del(`tier:${emailLower}`)
         } else {
             // 30-day TTL — subscription expires automatically
-            await client.setEx(`tier:${email}`, 30 * 24 * 60 * 60, tier)
+            await client.setEx(`tier:${emailLower}`, 30 * 24 * 60 * 60, tier)
         }
-        console.log(`[Tier] ${email} → ${tier}`)
+        console.log(`[Tier] ${emailLower} → ${tier}`)
         res.json({ success: true })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[set-tier]', err)
+        res.status(500).json({ error: 'Failed to update tier.' })
     }
 })
 

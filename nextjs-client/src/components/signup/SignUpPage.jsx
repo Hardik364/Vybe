@@ -1,9 +1,10 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
 
-const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
+const API             = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 function Spinner({ size = 18, white = false }) {
   return (
@@ -23,24 +24,29 @@ function Spinner({ size = 18, white = false }) {
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [step, setStep] = useState('new')        // 'new' | 'returning' | 'otp'
+  // steps: 'new' | 'returning' | 'otp' | 'google-gender'
+  const [step, setStep]               = useState('new')
   const [pendingEmail, setPendingEmail] = useState('')
-  const [pendingName, setPendingName] = useState('')
-  const [isRet, setIsRet] = useState(false)
-  const [err, setErr] = useState('')
-  const [guestErr, setGuestErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [guestDone, setGuestDone] = useState(false)
+  const [pendingName, setPendingName]   = useState('')
+  const [isRet, setIsRet]             = useState(false)
+  const [err, setErr]                 = useState('')
+  const [guestErr, setGuestErr]       = useState('')
+  const [loading, setLoading]         = useState(false)
+  const [guestDone, setGuestDone]     = useState(false)
+  // Google new-user state
+  const [googlePending, setGooglePending] = useState(null)  // { nonce, displayName }
+
+  // Google callback ref — always points to latest closure so we avoid stale values
+  const googleCallbackRef = useRef(null)
+  const googleBtnRef      = useRef(null)
 
   useEffect(() => {
     if (localStorage.getItem('ub_guest_limit')) setGuestDone(true)
   }, [])
 
   useEffect(() => {
-    // If guest used their free call, keep them on signup — don't auto-redirect
     const guestLimitHit = localStorage.getItem('ub_guest_limit')
     if (guestLimitHit) return
-
     const token = localStorage.getItem('ub_token')
     if (token) {
       fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
@@ -50,22 +56,99 @@ export default function SignUpPage() {
     }
   }, [])
 
+  // ── Google sign-in handler ──────────────────────────────────
+  // Assigned to ref so Google's callback closure always reads the latest version
+  googleCallbackRef.current = useCallback(async (response) => {
+    setLoading(true); setGuestErr('')
+    try {
+      const res  = await fetch(`${API}/auth/google`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ credential: response.credential }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setGuestErr(data.error || 'Google sign-in failed'); return }
+
+      if (data.token) {
+        // Returning user — straight to chat
+        await handleVerified(data.token, data.username)
+      } else if (data.isNew) {
+        // New user — collect gender before creating account
+        setGooglePending({ nonce: data.nonce, displayName: data.displayName })
+        setStep('google-gender')
+      }
+    } catch {
+      setGuestErr('Cannot reach server. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // ── Load Google Identity Services script ────────────────────
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return
+
+    function initGoogle() {
+      if (!window.google || !googleBtnRef.current) return
+      window.google.accounts.id.initialize({
+        client_id:   GOOGLE_CLIENT_ID,
+        callback:    (resp) => googleCallbackRef.current(resp),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      })
+      renderGoogleBtn()
+    }
+
+    if (window.google) {
+      initGoogle()
+    } else {
+      const script = document.createElement('script')
+      script.src   = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      script.onload = initGoogle
+      document.head.appendChild(script)
+      return () => { try { document.head.removeChild(script) } catch {} }
+    }
+  }, [])
+
+  // Re-render Google button whenever the step changes back to a visible tab
+  useEffect(() => {
+    if (step === 'otp' || step === 'google-gender') return
+    if (!window.google?.accounts?.id || !googleBtnRef.current) return
+    renderGoogleBtn()
+  }, [step])
+
+  function renderGoogleBtn() {
+    if (!googleBtnRef.current || !window.google?.accounts?.id) return
+    window.google.accounts.id.renderButton(googleBtnRef.current, {
+      type:   'standard',
+      theme:  'outline',
+      size:   'large',
+      text:   'continue_with',
+      shape:  'rectangular',
+      width:  Math.min(googleBtnRef.current.getBoundingClientRect().width || 320, 400),
+      locale: 'en',
+    })
+  }
+
   function otpSent(email, name, ret) {
-    setPendingEmail(email); setPendingName(name); setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
+    setPendingEmail(email); setPendingName(name)
+    setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
   }
 
   async function handleVerified(token, username) {
     localStorage.setItem('ub_token', token)
     localStorage.setItem('ub_username', username)
     localStorage.removeItem('ub_guest')
-    localStorage.removeItem('ub_guest_limit')   // real account — clear guest flag
+    localStorage.removeItem('ub_guest_limit')
     router.push('/chat')
   }
 
   async function handleGuest() {
     setLoading(true)
     try {
-      const res = await fetch(`${API}/auth/guest`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      const res  = await fetch(`${API}/auth/guest`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       const data = await res.json()
       if (res.ok && data.token) {
         localStorage.setItem('ub_token', data.token)
@@ -88,6 +171,8 @@ export default function SignUpPage() {
     { college: 'BITS Pilani', color: 'oklch(72% 0.18 55)',  letter: 'BITS' },
   ]
 
+  const showTabs = step !== 'otp' && step !== 'google-gender'
+
   return (
     <div className="screen-signup">
       {/* ── LEFT HERO ── */}
@@ -102,40 +187,32 @@ export default function SignUpPage() {
           who get it.
         </h1>
         <p className="hero-desc">
-          UniBuddy matches you with students from your college and beyond for real voice conversations that actually go somewhere.
+          UniBuddy matches you with people for real voice conversations that actually go somewhere. Open to everyone — just bring yourself.
         </p>
 
-        {/* Stats pills */}
         <div className="hero-stats">
           {[
-            { dot: true, text: '1,200+ students online' },
-            { text: '🎓 College-verified only' },
+            { dot: true, text: '1,200+ people online' },
+            { text: '🔐 Email-verified accounts' },
             { text: '🔒 Safe & anonymous' },
           ].map((s, i) => (
-            <div
-              key={i}
-              className="hero-stat"
-              style={{ animationDelay: `${i * 0.8}s` }}
-            >
+            <div key={i} className="hero-stat" style={{ animationDelay: `${i * 0.8}s` }}>
               {s.dot && <span className="online-dot" />}
               {s.text}
             </div>
           ))}
         </div>
 
-        {/* Floating college cards */}
         <div className="hero-cards">
           {CARDS.map((c, i) => (
             <div key={i} className="hero-card">
-              <div
-                style={{
-                  width: 38, height: 38, borderRadius: '50%',
-                  background: c.color, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontWeight: 900, fontSize: 10,
-                  letterSpacing: '-0.5px', flexShrink: 0,
-                }}
-              >
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: c.color, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: 900, fontSize: 10,
+                letterSpacing: '-0.5px', flexShrink: 0,
+              }}>
                 {c.letter}
               </div>
               <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -155,13 +232,12 @@ export default function SignUpPage() {
           <ThemeToggle />
         </div>
 
-        {/* Logo */}
         <div className="form-logo">
           <div className="form-logo-mark">U</div>
           UniBuddy
         </div>
 
-        {guestDone && step !== 'otp' && (
+        {guestDone && showTabs && (
           <div style={{
             background: 'var(--accent-glow)', border: '1.5px solid var(--accent)',
             borderRadius: 'var(--r-md)', padding: '12px 16px', marginBottom: 4,
@@ -172,18 +248,23 @@ export default function SignUpPage() {
         )}
 
         <h2 className="form-heading">
-          {step === 'otp' ? '📬 Check your inbox' : step === 'new' ? '👋 Create account' : '👋 Welcome back'}
+          {step === 'otp'           ? '📬 Check your inbox'
+           : step === 'google-gender' ? '👋 One last step'
+           : step === 'new'          ? '👋 Create account'
+           : '👋 Welcome back'}
         </h2>
         <p className="form-sub">
           {step === 'otp'
             ? `We sent a 6-digit code to ${pendingEmail}`
+            : step === 'google-gender'
+            ? `Hi ${googlePending?.displayName || 'there'}! Just pick your gender to finish.`
             : step === 'new'
-            ? 'College email required — keeps it student-only'
-            : 'Log in with your college email'}
+            ? 'Any email works — verify once, talk forever'
+            : 'Log in with your email'}
         </p>
 
         {/* Auth Tabs */}
-        {step !== 'otp' && (
+        {showTabs && (
           <div className="auth-tabs">
             {['new', 'returning'].map(s => (
               <button
@@ -197,13 +278,41 @@ export default function SignUpPage() {
           </div>
         )}
 
-        {step === 'new'       && <StepNew       onOtp={otpSent} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
-        {step === 'returning' && <StepReturn     onOtp={otpSent} onSwitch={() => setStep('new')} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
-        {step === 'otp'       && <StepOtp        email={pendingEmail} name={pendingName} isRet={isRet} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
+        {step === 'new'          && <StepNew     onOtp={otpSent} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
+        {step === 'returning'    && <StepReturn   onOtp={otpSent} onSwitch={() => setStep('new')} err={err} setErr={setErr} loading={loading} setLoading={setLoading} />}
+        {step === 'otp'          && <StepOtp      email={pendingEmail} name={pendingName} isRet={isRet} onVerified={handleVerified} onBack={() => setStep(isRet ? 'returning' : 'new')} />}
+        {step === 'google-gender' && googlePending && (
+          <StepGoogleGender
+            displayName={googlePending.displayName}
+            nonce={googlePending.nonce}
+            onVerified={handleVerified}
+            onBack={() => { setStep('new'); setGooglePending(null) }}
+          />
+        )}
 
-        {step !== 'otp' && (
+        {/* Google Sign-In + divider + guest — shown on email tabs only */}
+        {showTabs && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--t4)', fontSize: 12, margin: '16px 0' }}>
+            {/* Google button — rendered by Google's library into this div */}
+            {GOOGLE_CLIENT_ID && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--t4)', fontSize: 12, margin: '16px 0 10px' }}>
+                  <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                  or continue with
+                  <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                </div>
+                {/* Google renders its iframe button here */}
+                <div
+                  ref={googleBtnRef}
+                  style={{ width: '100%', minHeight: 44, display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  {/* Fallback while script loads */}
+                  {loading && <Spinner />}
+                </div>
+              </>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--t4)', fontSize: 12, margin: '12px 0' }}>
               <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               or
               <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
@@ -222,10 +331,7 @@ export default function SignUpPage() {
 
         <p style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: 'var(--t3)' }}>
           Want community chat?{' '}
-          <a
-            href="/community"
-            style={{ color: 'var(--accent)', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--r-xs)', transition: 'all var(--t-fast)' }}
-          >
+          <a href="/community" style={{ color: 'var(--accent)', fontWeight: 700, padding: '2px 6px', borderRadius: 'var(--r-xs)', transition: 'all var(--t-fast)' }}>
             Community 💬
           </a>
         </p>
@@ -234,21 +340,60 @@ export default function SignUpPage() {
   )
 }
 
-/* ── Step: New Account ── */
+/* ── Shared gender options ── */
+const GENDER_OPTIONS = [
+  { value: 'male',        label: '👨 Male' },
+  { value: 'female',      label: '👩 Female' },
+  { value: 'transgender', label: '🏳️‍🌈 Transgender' },
+  { value: 'unspecified', label: '🤐 Prefer not to say' },
+]
+
+function GenderGrid({ gender, setGender, setErr }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 2 }}>
+        I identify as
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {GENDER_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => { setGender(opt.value); setErr?.('') }}
+            style={{
+              padding: '9px 12px', borderRadius: 'var(--r-md)',
+              border: gender === opt.value ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+              background: gender === opt.value ? 'var(--accent-glow)' : 'var(--bg-elev)',
+              color: gender === opt.value ? 'var(--accent)' : 'var(--t2)',
+              fontSize: 13, fontWeight: gender === opt.value ? 700 : 500,
+              cursor: 'pointer', transition: 'all var(--t-fast)', textAlign: 'left',
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Step: New Account (email) ── */
 function StepNew({ onOtp, err, setErr, loading, setLoading }) {
-  const [name,  setName]  = useState('')
-  const [email, setEmail] = useState('')
+  const [name,   setName]   = useState('')
+  const [email,  setEmail]  = useState('')
+  const [gender, setGender] = useState('')
 
   async function submit(e) {
     e.preventDefault()
     if (!name.trim())  return setErr('Enter your name')
-    if (!email.trim()) return setErr('Enter your college email')
+    if (!email.trim()) return setErr('Enter your email')
+    if (!gender)       return setErr('Select your gender to continue')
     setLoading(true)
     try {
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), username: name.trim() }),
+        body: JSON.stringify({ email: email.trim(), username: name.trim(), gender }),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
@@ -261,31 +406,31 @@ function StepNew({ onOtp, err, setErr, loading, setLoading }) {
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <input
-        className={`ub-input no-ico${err ? ' err' : ''}`}
+        className={`ub-input no-ico${err && !name ? ' err' : ''}`}
         type="text" placeholder="👤 What should we call you?" value={name}
         onChange={e => { setName(e.target.value); setErr('') }}
         autoFocus maxLength={24}
-        style={err ? { animation: 'shake 300ms ease' } : {}}
       />
       <input
         className="ub-input no-ico"
-        type="email" placeholder="🎓 College email (you@chitkara.edu.in)" value={email}
+        type="email" placeholder="📧 Your email address" value={email}
         onChange={e => { setEmail(e.target.value); setErr('') }}
         maxLength={80}
       />
+      <GenderGrid gender={gender} setGender={setGender} setErr={setErr} />
       {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
       <PrimaryBtn loading={loading}>📨 Send Verification Code →</PrimaryBtn>
     </form>
   )
 }
 
-/* ── Step: Returning ── */
+/* ── Step: Returning (email) ── */
 function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
   const [email, setEmail] = useState('')
 
   async function submit(e) {
     e.preventDefault()
-    if (!email.trim()) return setErr('Enter your college email')
+    if (!email.trim()) return setErr('Enter your email address')
     setLoading(true)
     try {
       const res = await fetch(`${API}/auth/send-otp`, {
@@ -295,7 +440,7 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Failed to send OTP'); setLoading(false); return }
-      onOtp(email.trim(), data.username || '', true, data.devOtp || null)
+      onOtp(email.trim(), data.username || '', true)
     } catch {
       setErr('Cannot reach server.'); setLoading(false)
     }
@@ -305,7 +450,7 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
       <input
         className="ub-input no-ico"
-        type="email" placeholder="🎓 Your college email" value={email}
+        type="email" placeholder="📧 Your email address" value={email}
         onChange={e => { setEmail(e.target.value); setErr('') }}
         autoFocus
       />
@@ -318,12 +463,56 @@ function StepReturn({ onOtp, onSwitch, err, setErr, loading, setLoading }) {
   )
 }
 
+/* ── Step: Google new user — collect gender + optional username ── */
+function StepGoogleGender({ displayName, nonce, onVerified, onBack }) {
+  const [username, setUsername] = useState(displayName || '')
+  const [gender,   setGender]   = useState('')
+  const [err,      setErr]      = useState('')
+  const [loading,  setLoading]  = useState(false)
+
+  async function complete(e) {
+    e.preventDefault()
+    if (!gender)          return setErr('Please select your gender')
+    if (!username.trim()) return setErr('Enter a display name')
+    setLoading(true)
+    try {
+      const res = await fetch(`${API}/auth/google/complete`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ nonce, gender, username: username.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error || 'Something went wrong.'); setLoading(false); return }
+      onVerified(data.token, data.username)
+    } catch {
+      setErr('Cannot reach server.'); setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={complete} style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+      <input
+        className="ub-input no-ico"
+        type="text" placeholder="👤 Display name" value={username}
+        onChange={e => { setUsername(e.target.value); setErr('') }}
+        maxLength={24} autoFocus
+      />
+      <GenderGrid gender={gender} setGender={setGender} setErr={setErr} />
+      {err && <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', animation: 'shake 300ms ease' }}>{err}</p>}
+      <PrimaryBtn loading={loading}>🚀 Finish & Start Talking →</PrimaryBtn>
+      <button type="button" onClick={onBack} style={{ fontSize: 13, color: 'var(--t3)', padding: '4px 0', cursor: 'pointer', background: 'none', border: 'none' }}>
+        ← Use email instead
+      </button>
+    </form>
+  )
+}
+
 /* ── Step: OTP ── */
 function StepOtp({ email, name, isRet, onVerified, onBack }) {
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [err, setErr] = useState('')
+  const [otp, setOtp]       = useState(['', '', '', '', '', ''])
+  const [err, setErr]       = useState('')
   const [loading, setLoading] = useState(false)
-  const [cd, setCd] = useState(60)
+  const [cd, setCd]         = useState(60)
   const refs = useRef([])
 
   useEffect(() => {

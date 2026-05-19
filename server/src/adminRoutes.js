@@ -5,8 +5,10 @@ import { getSnapshot } from './userRegistry.js'
 const router = Router()
 
 // ── Admin auth middleware ─────────────────────────────────────
+// Key MUST be sent via header — never via query string (would appear in server logs,
+// browser history, and Referer headers sent to third-party resources).
 function requireAdmin(req, res, next) {
-    const key = req.headers['x-admin-key'] || req.query.key
+    const key = req.headers['x-admin-key']
     if (!key || key !== process.env.ADMIN_KEY) {
         return res.status(403).json({ error: 'Forbidden' })
     }
@@ -42,7 +44,8 @@ router.get('/dashboard', requireAdmin, async (req, res) => {
             timestamp: new Date().toISOString(),
         })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[admin/dashboard]', err)
+        res.status(500).json({ error: 'Internal server error' })
     }
 })
 

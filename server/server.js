@@ -70,26 +70,41 @@ const io = new Server(httpServer, {
   pingInterval: 10000,
 })
 
+// ── Startup guard: refuse to run with default/missing secrets ──
+const DEFAULT_JWT = 'unibuddy_jwt_secret_change_this_in_production_2024'
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_JWT) {
+  console.error('❌ FATAL: JWT_SECRET is not set or is the default placeholder. Set a strong random secret in your environment.')
+  if (process.env.NODE_ENV === 'production') process.exit(1)
+}
+
 // ── Socket.IO auth middleware ─────────────────────────────────
 io.use((socket, next) => {
   const token    = socket.handshake.auth.token
   const username = socket.handshake.auth.username
 
+  // Validate genderPref here so socketRoutes never sees an arbitrary string
+  const VALID_PREFS = new Set(['anyone', 'male', 'female', 'transgender'])
+  socket.genderPref = VALID_PREFS.has(socket.handshake.auth.genderPref)
+    ? socket.handshake.auth.genderPref
+    : 'anyone'
+
   if (token) {
     try {
-      const user           = jwt.verify(token, process.env.JWT_SECRET)
+      // Pin algorithm to HS256 — prevents alg:none and RS256-confusion attacks
+      const user           = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
       socket.username      = user.username
       socket.email         = user.email
       socket.collegeDomain = user.collegeDomain
       return next()
     } catch {
-      if (process.env.NODE_ENV === 'production') {
-        return next(new Error('Invalid or expired token'))
-      }
+      // Always reject invalid/expired tokens — no dev-mode bypass.
+      // Use valid tokens in development too.
+      return next(new Error('Invalid or expired token'))
     }
   }
 
-  if (!username) return next(new Error("invalid username"))
+  // No token — allow only explicit guest sessions
+  if (!username) return next(new Error('Authentication required'))
   socket.username = username
 
   // ── Guest tracking ───────────────────────────────────────────
@@ -98,8 +113,8 @@ io.use((socket, next) => {
   if (isGuest) {
     socket.isGuest  = true
     socket.deviceId = socket.handshake.auth.deviceId || null
-    socket.guestIp  = socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim()
-                      || socket.handshake.address
+    // Use socket address (from Render's trusted proxy) — cannot be spoofed
+    socket.guestIp  = socket.handshake.address
   }
 
   next()

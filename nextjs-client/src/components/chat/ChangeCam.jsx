@@ -16,7 +16,10 @@ export default function ChangeCam({ peerConnection, localVideoRef, show, setShow
         setDevices(devs)
         inst = await openMediaStream()
         if (previewRef.current) previewRef.current.srcObject = inst
-        setStream(inst)
+        // Do NOT call setStream(inst) here. The preview stream is only for
+        // the camera-picker dialog. Replacing the main stream at this point
+        // would kill the audio-only stream being sent over the peer connection,
+        // and Cancel would leave the stranger with no audio.
       } catch (err) { console.error('[ChangeCam]', err) }
     }
     setup()
@@ -37,7 +40,11 @@ export default function ChangeCam({ peerConnection, localVideoRef, show, setShow
         <select
           className="bg-elev border border-bdr rounded-md text-t1 text-[14px] px-3 py-2.5 outline-none"
           defaultValue=""
-          onChange={e => { changePreviewCam(e.target.value, previewRef, setStream); setSelectedDeviceId(e.target.value) }}
+          onChange={e => {
+            // Only updates preview — main stream untouched until Apply.
+            changePreviewCam(e.target.value, previewRef)
+            setSelectedDeviceId(e.target.value)
+          }}
         >
           <option value="" disabled>Choose camera…</option>
           {devices.map((d, i) => (

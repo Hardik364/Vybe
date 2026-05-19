@@ -6,10 +6,11 @@ export default function MessageBox({ messages, username, socket, setMessage, str
 
   useEffect(() => {
     if (!socket) return
-    socket.on('messageResponse', data => {
-      setMessage(prev => [...prev, { user: 'stranger', message: data.message }])
-    })
-    return () => socket.removeAllListeners('messageResponse')
+    // Use named handler so cleanup removes only THIS listener,
+    // not any other component that may also listen to 'messageResponse'.
+    const handler = data => setMessage(prev => [...prev, { user: 'stranger', message: data.message }])
+    socket.on('messageResponse', handler)
+    return () => socket.off('messageResponse', handler)
   }, [socket])
 
   useEffect(() => {

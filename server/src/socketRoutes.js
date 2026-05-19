@@ -1,6 +1,7 @@
-import { processUserPairing, soloUserLeftTheChat, emitLiveCount } from "./userConstroller/userController.js"
+import { processUserPairing, soloUserLeftTheChat, emitLiveCount, emitGenderStats } from "./userConstroller/userController.js"
 // soloUserLeftTheChat is also called on disconnect to purge ghost queue entries
-import { registerUser, updateStatus, removeUser } from "./userRegistry.js"
+import { registerUser, updateStatus, updateGenderPref, removeUser } from "./userRegistry.js"
+import registry from "./userRegistry.js"   // default export = the Map itself
 import { werePartnered, cleanupPartnership } from "./partnerships.js"
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -24,10 +25,13 @@ const pendingConnects = new Map()
 // ── Per-socket rate limiter ───────────────────────────────────────────────────
 // limits: Map of event name → { windowMs, max }
 const RATE_LIMITS = {
-    'channel:message': { windowMs: 3000,  max: 5  },  // 5 msgs per 3 sec
-    'reportUser':      { windowMs: 60000, max: 3  },  // 3 reports per min
-    'rateUser':        { windowMs: 60000, max: 10 },  // 10 ratings per min
-    'private message': { windowMs: 1000,  max: 10 },  // 10 msgs per sec
+    'channel:message':  { windowMs: 3000,  max: 5  },  // 5 msgs per 3 sec
+    'reportUser':       { windowMs: 60000, max: 3  },  // 3 reports per min
+    'rateUser':         { windowMs: 60000, max: 10 },  // 10 ratings per min
+    'private message':  { windowMs: 1000,  max: 10 },  // 10 msgs per sec
+    'chatMessage':      { windowMs: 2000,  max: 8  },  // 8 per-call messages per 2 sec
+    'startConnection':  { windowMs: 3000,  max: 3  },  // 3 re-queues per 3 sec (prevents Redis flood)
+    'connectRequest':   { windowMs: 10000, max: 5  },  // 5 connect presses per 10 sec
 }
 
 // socketId → Map<eventName, { count, resetAt }>
@@ -86,10 +90,19 @@ async function incrementGuestCalls(socket) {
     await pipe.exec()
 }
 
-export function handelSocketConnection(io, socket) {
+export async function handelSocketConnection(io, socket) {
 
-    // Register user in live registry
+    // ── Load gender from Redis (persisted server-side, not trusted from client) ──
+    if (socket.email) {
+        socket.gender = await client.get(`user:gender:${socket.email}`) || 'unspecified'
+    } else {
+        socket.gender = 'unspecified'
+    }
+    // genderPref was validated and set in the auth middleware (server.js)
+
+    // Register user in live registry (gender + genderPref now on socket)
     registerUser(socket)
+    emitGenderStats(io)
 
     // Join a persistent college room — stays joined for the entire session
     // (waiting AND in-call). Used for accurate live count.
@@ -98,6 +111,9 @@ export function handelSocketConnection(io, socket) {
 
     // ── Pairing ──────────────────────────────────────────────
     socket.on("startConnection", async () => {
+        // Rate limit: prevent Redis flood from rapid re-queue clicks
+        if (isRateLimited(socket.id, 'startConnection')) return
+
         // Block guests who have already used their free call today
         if (socket.isGuest) {
             const exceeded = await hasGuestExceededLimit(socket)
@@ -111,6 +127,9 @@ export function handelSocketConnection(io, socket) {
     })
 
     socket.on("pairedUserLeftTheChat", to => {
+        // Validate the two sockets were actually partnered — prevents
+        // any socket from sending strangerLeftTheChat to a random target.
+        if (!werePartnered(socket.id, to)) return
         io.to(to).emit("strangerLeftTheChat")
         updateStatus(socket.id, 'waiting')
         updateStatus(to, 'waiting')
@@ -125,29 +144,46 @@ export function handelSocketConnection(io, socket) {
         emitLiveCount(io, socket)
     })
 
+    // ── Gender preference — can be changed from navbar anytime ──
+    // Only takes effect for the NEXT queue entry (current wait slot is already pushed).
+    socket.on('updateGenderPref', pref => {
+        const VALID = new Set(['anyone', 'male', 'female', 'transgender'])
+        if (!VALID.has(pref)) return
+        socket.genderPref = pref
+        updateGenderPref(socket.id, pref)
+    })
+
     // ── WebRTC signaling ─────────────────────────────────────
     socket.on('message', m => io.to(m.to).emit('message', m))
 
     // ── Text chat ─────────────────────────────────────────────
     socket.on('chatMessage', m => {
         if (!m?.to || !m?.message) return
-        io.to(m.to).emit('messageResponse', { message: m.message })
+        if (isRateLimited(socket.id, 'chatMessage')) return
+        if (!werePartnered(socket.id, m.to)) return   // prevent messaging arbitrary sockets
+        // Sanitize: strip HTML tags, enforce length cap
+        const safe = String(m.message).replace(/<[^>]*>/g, '').trim().slice(0, 1000)
+        if (!safe) return
+        io.to(m.to).emit('messageResponse', { message: safe })
     })
 
     // ── Prompt sync ──────────────────────────────────────────
     socket.on('requestPrompt', ({ to }) => {
+        if (!werePartnered(socket.id, to)) return
         const prompt = pickPrompt()
         io.to(socket.id).emit('showPrompt', prompt)
         io.to(to).emit('showPrompt', prompt)
     })
 
     socket.on('nextPrompt', ({ to, excludeId }) => {
+        if (!werePartnered(socket.id, to)) return
         const prompt = pickPrompt(excludeId)
         io.to(socket.id).emit('showPrompt', prompt)
         io.to(to).emit('showPrompt', prompt)
     })
 
     socket.on('dismissPrompt', ({ to }) => {
+        if (!werePartnered(socket.id, to)) return
         io.to(socket.id).emit('hidePrompt')
         io.to(to).emit('hidePrompt')
     })
@@ -155,12 +191,14 @@ export function handelSocketConnection(io, socket) {
     // ── Video — each user controls their own camera ───────────
     // Pressing Enable Video turns YOUR camera on immediately.
     // Partner gets notified so they can optionally do the same.
-    socket.on('videoOn',  ({ to }) => io.to(to).emit('partnerVideoOn'))
-    socket.on('videoOff', ({ to }) => io.to(to).emit('partnerVideoOff'))
+    socket.on('videoOn',  ({ to }) => { if (werePartnered(socket.id, to)) io.to(to).emit('partnerVideoOn') })
+    socket.on('videoOff', ({ to }) => { if (werePartnered(socket.id, to)) io.to(to).emit('partnerVideoOff') })
 
     // ── Connect / Move On ─────────────────────────────────────
     socket.on('connectRequest', ({ to, contact }) => {
-        // Always notify partner immediately that this user pressed Connect
+        if (isRateLimited(socket.id, 'connectRequest')) return
+        if (!werePartnered(socket.id, to)) return   // prevent fake partnerConnect spam
+        // Notify partner immediately that this user pressed Connect
         io.to(to).emit('partnerConnect')
 
         if (pendingConnects.has(to) && pendingConnects.get(to).partnerId === socket.id) {
@@ -218,6 +256,7 @@ export function handelSocketConnection(io, socket) {
     })
 
     socket.on('moveOn', ({ to }) => {
+        if (!werePartnered(socket.id, to)) return
         if (pendingConnects.has(socket.id)) {
             clearTimeout(pendingConnects.get(socket.id).timer)
             pendingConnects.delete(socket.id)
@@ -242,20 +281,26 @@ export function handelSocketConnection(io, socket) {
         }
 
         try {
-            await client.hIncrBy(`karma:${to}`, rating, 1)
-            await client.hIncrBy(`karma:${to}`, 'total', 1)
+            // Key karma by the target socket's email (persistent across reconnects),
+            // falling back to socket ID only for unauthenticated guests.
+            const targetSocket = io.sockets.sockets.get(to)
+            const karmaKey = targetSocket?.email
+                ? `karma:email:${targetSocket.email}`
+                : `karma:socket:${to}`
 
-            const karma = await client.hGetAll(`karma:${to}`)
+            await client.hIncrBy(karmaKey, rating, 1)
+            await client.hIncrBy(karmaKey, 'total', 1)
+
+            const karma = await client.hGetAll(karmaKey)
             const total = parseInt(karma.total || 0)
             const bad   = parseInt(karma.disrespectful || 0)
             if (total >= 5 && bad / total > 0.2) {
-                // Shadow-ban by socket ID (current session) AND by email (persistent)
-                await client.sAdd('shadowBanned', to)
-                const targetSocket = io.sockets.sockets.get(to)
+                // Shadow-ban persistently by email — survives reconnects
                 if (targetSocket?.email) {
                     await client.sAdd('shadowBanned:emails', targetSocket.email)
                     console.log(`[Karma] Shadow-banned ${targetSocket.email} (${bad}/${total} disrespectful)`)
                 } else {
+                    await client.sAdd('shadowBanned', to)
                     console.log(`[Karma] Shadow-banned socket ${to} (${bad}/${total} disrespectful)`)
                 }
             }
@@ -281,9 +326,12 @@ export function handelSocketConnection(io, socket) {
         }
 
         try {
+            // Deduplicate reporters by email (not socket ID) so cycling
+            // connections can't generate multiple reports from one person.
+            const reporterKey = socket.email || socket.id
             await client.zAdd(`reports:${to}`, {
                 score: Date.now(),
-                value: socket.id,
+                value: reporterKey,
             }, { NX: true })
 
             const reportCount = await client.zCard(`reports:${to}`)
@@ -292,6 +340,15 @@ export function handelSocketConnection(io, socket) {
             if (reportCount >= 3) {
                 const reportedSocket = io.sockets.sockets.get(to)
                 if (reportedSocket) {
+                    // Notify the reported user's current partner BEFORE disconnecting
+                    // so they don't get stuck with a frozen call.
+                    const reportedRecord    = registry.get(to)
+                    const reportedPartnerId = reportedRecord?.pairedWith
+                    if (reportedPartnerId) {
+                        io.to(reportedPartnerId).emit('strangerLeftTheChat')
+                        updateStatus(reportedPartnerId, 'waiting')
+                    }
+
                     if (reportedSocket.email) {
                         await client.sAdd('banned:emails', reportedSocket.email)
                         console.log(`[Report] Banned email: ${reportedSocket.email}`)
@@ -311,7 +368,12 @@ export function handelSocketConnection(io, socket) {
     // ── Community Channels ────────────────────────────────────
     socket.on('channel:join', async ({ channelId }) => {
         if (!channelId) return
+        // Validate format: alphanumeric + hyphens only, 2–32 chars
+        if (!/^[a-z0-9-]{2,32}$/.test(channelId)) return
         try {
+            // Only join if the channel actually exists — prevents Redis keyspace pollution
+            const exists = await client.exists(`channel:${channelId}`)
+            if (!exists) return
             socket.join(`ch:${channelId}`)
             await client.hIncrBy(`channel:${channelId}`, 'memberCount', 1)
             const count = io.sockets.adapter.rooms.get(`ch:${channelId}`)?.size || 0
@@ -360,14 +422,16 @@ export function handelSocketConnection(io, socket) {
         }
 
         try {
-            const text = content.trim().slice(0, 500)
+            // Strip HTML tags (XSS prevention) + enforce length cap
+            const text = content.trim().replace(/<[^>]*>/g, '').slice(0, 500)
+            if (!text) return
 
             const msg = {
                 id:        `${Date.now()}-${socket.id.slice(0, 6)}`,
                 channelId,
                 content:   text,
-                author:    socket.username || 'anonymous',
-                email:     socket.email    || null,
+                author:    (socket.username || 'anonymous').replace(/<[^>]*>/g, '').slice(0, 32),
+                // email intentionally omitted — never expose email addresses in public channel messages
                 timestamp: Date.now(),
             }
 
@@ -421,16 +485,33 @@ export function handelSocketConnection(io, socket) {
             // Without this, a refresh leaves a ghost entry in the queue.
             // The ghost can be picked up and paired with the same user's
             // new socket — making them talk to themselves.
+
+            // Look up partner BEFORE removeUser wipes the record.
+            // If this socket was in a call, notify the partner so they
+            // don't get stuck with a frozen peer connection forever.
+            const record    = registry.get(socket.id)
+            const partnerId = record?.pairedWith
+
             await soloUserLeftTheChat(socket)
+
+            if (partnerId) {
+                io.to(partnerId).emit('strangerLeftTheChat')
+                updateStatus(partnerId, 'waiting')
+            }
 
             if (pendingConnects.has(socket.id)) {
                 clearTimeout(pendingConnects.get(socket.id).timer)
                 pendingConnects.delete(socket.id)
             }
 
-            cleanupPartnership(socket.id)
+            // Grace period before wiping partnership record so the partner
+            // can still submit a rating/report during the post-call window.
+            // 35 s = PostCallScreen 30 s timer + 5 s buffer, ensuring moveOn
+            // events are never silently dropped before the record is cleaned up.
+            setTimeout(() => cleanupPartnership(socket.id), 35_000)
             cleanupRateLimit(socket.id)
             removeUser(socket.id)
+            emitGenderStats(io)
             socket.removeAllListeners()
         } catch (error) {
             console.error('[disconnect cleanup]', error)

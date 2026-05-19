@@ -70,8 +70,10 @@ export default async function addUserTODb(socket) {
             collegeDomain: socket.collegeDomain || 'global',
             userState:     socket.userState || null,
             tier:          socket.tier,
+            gender:        socket.gender    || 'unspecified',
+            genderPref:    socket.genderPref || 'anyone',
         }))
-        console.log(`[Queue] ${socket.username} (${socket.tier}, state=${socket.userState || 'unknown'}) → ${queueKey} (len=${result})`)
+        console.log(`[Queue] ${socket.username} (${socket.tier}, gender=${socket.gender || 'unspecified'}, seeking=${socket.genderPref || 'anyone'}) → ${queueKey} (len=${result})`)
     } catch (err) {
         console.error('[addUserTODb]', err)
         socket.emit("errSelectingPair")

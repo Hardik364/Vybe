@@ -2,22 +2,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
-import UpgradeModal from '@/components/modals/UpgradeModal'
 
 const API = process.env.NEXT_PUBLIC_APP_WEBSOCKET_URL
 
-const TIER_INFO = {
-  free: { label: 'Free', color: 'oklch(55% 0.01 265)', scope: 'Your college only' },
-  plus: { label: 'Plus', color: 'var(--accent)',        scope: 'Same state colleges' },
-  pro:  { label: 'Pro',  color: 'var(--amber)',         scope: 'Any college globally' },
-}
-
 export default function AccountPage() {
   const router = useRouter()
-  const [user,    setUser]    = useState(null)
-  const [tier,    setTier]    = useState('free')
-  const [history, setHistory] = useState([])
-  const [showUp,  setShowUp]  = useState(false)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const token = localStorage.getItem('ub_token')
@@ -27,8 +17,6 @@ export default function AccountPage() {
       .then(d => {
         if (!d.valid) { router.push('/signup'); return }
         setUser(d)
-        setTier(d.tier || 'free')
-        setHistory(d.purchaseHistory || [])
       })
       .catch(() => router.push('/signup'))
   }, [])
@@ -37,8 +25,6 @@ export default function AccountPage() {
     localStorage.clear()
     router.push('/signup')
   }
-
-  const info = TIER_INFO[tier] || TIER_INFO.free
 
   if (!user) return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -79,79 +65,9 @@ export default function AccountPage() {
                   {user.username}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>
-                  🎓 Logged in via college email · {user.college || 'Verified Student'}
+                  ✉️ {user.email || 'Verified Account'}
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Plan card */}
-          <div className="acc-card">
-            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              Current Plan
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{
-                padding: '5px 16px', borderRadius: 'var(--r-full)',
-                fontSize: 13, fontWeight: 900, color: '#fff',
-                background: info.color,
-              }}>
-                {info.label}
-              </span>
-              <span style={{ fontSize: 14, color: 'var(--t2)' }}>{info.scope}</span>
-            </div>
-            {tier === 'free' && (
-              <p style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.5 }}>
-                You're on the free plan. Upgrade to match students beyond your college. 🚀
-              </p>
-            )}
-            <button
-              onClick={() => setShowUp(true)}
-              style={{
-                padding: '13px 0', borderRadius: 'var(--r-md)',
-                fontSize: 14, fontWeight: 900, color: '#fff', border: 'none',
-                background: tier === 'free' ? 'var(--accent)' : info.color,
-                cursor: 'pointer', transition: 'all var(--t-fast)',
-                position: 'relative', overflow: 'hidden',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--sh-md)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
-            >
-              <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,oklch(100% 0 0/0.1),transparent)', pointerEvents: 'none' }} />
-              {tier === 'free' ? '⚡ Upgrade Plan' : '🔄 Change Plan'}
-            </button>
-          </div>
-
-          {/* Purchase history card */}
-          <div className="acc-card">
-            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              Purchase History
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {history.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--t4)' }}>No purchases yet</p>
-              ) : history.map((h, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '11px 14px', background: 'var(--bg-elev)',
-                    borderRadius: 'var(--r-md)', transition: 'background var(--t-fast)',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-float)'}
-                  onMouseLeave={e => e.currentTarget.style.background = ''}
-                >
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t1)' }}>{h.planId}</div>
-                    <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
-                      {new Date(h.activatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 900, color: TIER_INFO[h.tier]?.color }}>
-                    {TIER_INFO[h.tier]?.label}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -205,7 +121,7 @@ export default function AccountPage() {
                 Students.<br />Connected.
               </h2>
               <p style={{ fontSize: 15, color: 'var(--t2)', maxWidth: 340, lineHeight: 1.6, margin: '0 auto' }}>
-                Every node is a college. Every line is a conversation. Upgrade to unlock more connections. 🌍
+                Every node is a college. Every line is a conversation. Start talking — your next great conversation is one tap away. 🌍
               </p>
             </div>
 
@@ -233,13 +149,6 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {showUp && (
-        <UpgradeModal
-          currentTier={tier}
-          onClose={() => setShowUp(false)}
-          onTierChange={t => { setTier(t); setShowUp(false) }}
-        />
-      )}
     </div>
   )
 }

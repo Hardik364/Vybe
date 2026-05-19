@@ -35,7 +35,7 @@ export async function getUser(email) {
  * Create or update a user on first OTP verification.
  * Uses upsert so re-verification doesn't overwrite the username.
  */
-export async function upsertUser({ email, username, collegeDomain, state = null }) {
+export async function upsertUser({ email, username, collegeDomain, state = null, gender = null }) {
     if (guard('upsertUser')) return null
 
     const payload = {
@@ -45,7 +45,9 @@ export async function upsertUser({ email, username, collegeDomain, state = null 
         last_seen_at:   new Date().toISOString(),
     }
     // Only set city/state if supplied (new signups only — returning logins skip this)
-    if (state) payload.city = state
+    if (state)  payload.city   = state
+    // Only set gender on first signup — update-gender endpoint handles changes
+    if (gender) payload.gender = gender
 
     const { data, error } = await supabase
         .from('users')

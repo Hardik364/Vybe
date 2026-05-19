@@ -3,6 +3,7 @@ import makePair from "./makePair.js";
 import addUserTODb from "./addUserToDb.js";
 import { getSelfQueue } from "../utils/tierMatching.js";
 import { updateStatus } from "../userRegistry.js";
+import registry from "../userRegistry.js";
 import { recordPartnership } from "../partnerships.js";
 import { sendCollegeNotifications } from "../pushNotify.js";
 import { readFileSync } from 'fs'
@@ -15,6 +16,29 @@ const _prompts   = JSON.parse(readFileSync(join(__dirname, '../data/prompts.json
 
 function pickPrompt() {
     return _prompts[Math.floor(Math.random() * _prompts.length)]
+}
+
+// Broadcast live gender breakdown to ALL connected sockets.
+// Scans the in-memory registry — no Redis needed.
+export function emitGenderStats(io) {
+    try {
+        const counts = { male: 0, female: 0, transgender: 0 }
+        for (const user of registry.values()) {
+            if (counts[user.gender] !== undefined) counts[user.gender]++
+        }
+        const total = counts.male + counts.female + counts.transgender
+        io.emit('genderStats', {
+            male:           counts.male,
+            female:         counts.female,
+            transgender:    counts.transgender,
+            total,
+            pctMale:        total > 0 ? Math.round(counts.male        / total * 100) : 0,
+            pctFemale:      total > 0 ? Math.round(counts.female      / total * 100) : 0,
+            pctTransgender: total > 0 ? Math.round(counts.transgender / total * 100) : 0,
+        })
+    } catch (err) {
+        console.error('[emitGenderStats]', err)
+    }
 }
 
 // Broadcast total online count for this socket's college
@@ -76,6 +100,7 @@ export async function processUserPairing(io, socket) {
             socket.join(room)
             io.to(socket.id).emit("waiting", "Waiting for another user to join")
             emitLiveCount(io, socket)
+            emitGenderStats(io)
 
             // 0 → 1 transition: notify waitlisted users for this college
             if (prevCount === 0) {
@@ -84,6 +109,21 @@ export async function processUserPairing(io, socket) {
                 )
             }
         } else {
+            // ── Liveness check: both sockets must still be connected ──────
+            // Between makePair's lRem and here, a socket may have disconnected.
+            // io.to(deadId).emit() is a silent no-op, leaving the other user
+            // stuck in a dead call forever with no ICE candidates arriving.
+            const liveS0 = io.sockets.sockets.get(userPair[0].socketId)
+            const liveS1 = io.sockets.sockets.get(userPair[1].socketId)
+            if (!liveS0 || !liveS1) {
+                console.warn('[processUserPairing] Ghost match — one socket disconnected between queue-pop and pair. Re-queuing survivor.')
+                // Re-queue the surviving socket by emitting errMakingPair
+                // (client's errMakingPair handler calls startConnection again)
+                const survivor = liveS0 || liveS1
+                if (survivor) survivor.emit('errMakingPair')
+                return
+            }
+
             // Paired — notify both sockets and update registry
             const room = `waiting:${socket.collegeDomain || 'global'}`
             updateStatus(userPair[0].socketId, 'in-call', userPair[1].socketId, userPair[1].username)
@@ -108,9 +148,10 @@ export async function processUserPairing(io, socket) {
                 io.to(key.socketId).emit("getStragerData", { ...key, prompt: matchPrompt })
             })
             emitLiveCount(io, socket)
+            emitGenderStats(io)
         }
     } catch (err) {
-        socket.emit("errSelectingPair")
+        socket.emit("errMakingPair")
         console.error('[processUserPairing]', err)
     }
 }
@@ -118,11 +159,16 @@ export async function processUserPairing(io, socket) {
 export async function soloUserLeftTheChat(socket) {
     try {
         const queueKey = getSelfQueue(socket)
+        // Must match the exact JSON that addUserToDb pushed — including gender/genderPref
         const check    = await client.lRem(queueKey, 1, JSON.stringify({
             socketId:      socket.id,
             username:      socket.username,
+            email:         socket.email    || null,
             collegeDomain: socket.collegeDomain || 'global',
+            userState:     socket.userState || null,
             tier:          socket.tier || 'free',
+            gender:        socket.gender    || 'unspecified',
+            genderPref:    socket.genderPref || 'anyone',
         }))
         if (check > 0) console.log(`[Queue] ${socket.username} removed from ${queueKey}`)
         return check

@@ -5,11 +5,12 @@ export async function getConnectedDevices() {
   return devices.filter(d => d.kind === 'videoinput')
 }
 
-export async function changePreviewCam(deviceId, videoPreviewRef, setStream) {
+// Only updates the in-dialog preview — does NOT touch the main stream.
+// setStream is intentionally removed; main stream only changes on Apply.
+export async function changePreviewCam(deviceId, videoPreviewRef) {
   try {
     const stream = await openMediaStream(deviceId, false)
     if (videoPreviewRef.current) videoPreviewRef.current.srcObject = stream
-    setStream(stream)
   } catch (err) {
     console.error('[changePreviewCam]', err)
   }

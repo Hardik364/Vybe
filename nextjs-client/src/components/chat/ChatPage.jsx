@@ -11,6 +11,7 @@ import PromptCard from './PromptCard'
 import NotifyMe from '@/components/NotifyMe'
 import PostCallScreen from '@/components/modals/PostCallScreen'
 import KarmaModal from '@/components/modals/KarmaModal'
+import AccountDrawer from '@/components/account/AccountDrawer'
 import useSocket from '@/hooks/useSocket'
 import usePeerConnection from '@/hooks/usePeerConnection'
 import { initIceServers } from '@/utils/pcInstance'
@@ -78,13 +79,19 @@ export default function ChatPage() {
   const [liveCount, setLiveCount]           = useState(0)
   const [collegeDomain, setCollegeDomain]   = useState('launch')
   const [reportSent, setReportSent]         = useState(false)
+  const [showAccount, setShowAccount]       = useState(false)
+  const [genderPref, setGenderPref]         = useState(() => {
+    if (typeof window === 'undefined') return 'anyone'
+    return localStorage.getItem('ub_gender_pref') || 'anyone'
+  })
 
   const localVideoRef  = useRef(null)
   const remoteVideoRef = useRef(null)
   const signalingRef   = useRef(null)
 
-  const { socket, strangerUserId, strangerUsername, connectionStatus } = useSocket(
-    username, remoteVideoRef, setMessage, updateUser, peerConnection, setPeerConnection, setStrangerData
+  const { socket, strangerUserId, strangerUsername, connectionStatus, genderStats } = useSocket(
+    username, remoteVideoRef, setMessage, updateUser, peerConnection, setPeerConnection, setStrangerData,
+    genderPref
   )
   usePeerConnection(setPeerConnection)
 
@@ -149,6 +156,22 @@ export default function ChatPage() {
   }
   function handleConnect() { setShowPostCall(false); setShowKarma(true) }
   function handleMoveOn()  { setShowPostCall(false); setShowKarma(true) }
+  function doLogout() {
+    // Notify partner before socket is torn down, so they don't get stuck
+    if (connectionStatus && socket && strangerUserId) {
+      socket.emit('pairedUserLeftTheChat', strangerUserId)
+    }
+    localStorage.clear()
+    router.push('/signup')
+  }
+
+  function handleGenderPrefChange(pref) {
+    setGenderPref(pref)
+    localStorage.setItem('ub_gender_pref', pref)
+    // Notify server so the next queue entry uses the new preference
+    if (socket) socket.emit('updateGenderPref', pref)
+  }
+
   function handleKarmaRate() {
     setShowKarma(false); setActivePrompt(null); setLastStrangerId(null)
     setUpdateUser(p => p + 1)
@@ -169,9 +192,12 @@ export default function ChatPage() {
         promptActive={!!activePrompt}
         onPromptClick={handlePromptToggle}
         liveCount={liveCount}
-        onLogout={() => { localStorage.clear(); router.push('/signup') }}
-        onAccount={() => router.push('/account')}
-        onCommunity={() => router.push('/signup')}
+        onLogout={doLogout}
+        onAccount={() => setShowAccount(true)}
+        onCommunity={() => { if (!connectionStatus) router.push('/signup') }}
+        genderPref={genderPref}
+        onGenderPrefChange={handleGenderPrefChange}
+        genderStats={genderStats}
       />
 
       <div className="chat-layout">
@@ -264,6 +290,12 @@ export default function ChatPage() {
           onRate={handleKarmaRate}
         />
       )}
+
+      <AccountDrawer
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+        onLogout={doLogout}
+      />
     </div>
   )
 }

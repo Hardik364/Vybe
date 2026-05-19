@@ -4,17 +4,25 @@ const registry = new Map()
 
 export function registerUser(socket) {
     registry.set(socket.id, {
-        socketId:     socket.id,
-        username:     socket.username     || 'anonymous',
-        email:        socket.email        || null,
+        socketId:      socket.id,
+        username:      socket.username      || 'anonymous',
+        email:         socket.email         || null,
         collegeDomain: socket.collegeDomain || 'global',
-        tier:         socket.tier         || 'free',
-        shadowBanned: socket.shadowBanned || false,
-        status:       'connecting',     // connecting | waiting | in-call
-        pairedWith:   null,             // socketId of partner
+        tier:          socket.tier          || 'free',
+        shadowBanned:  socket.shadowBanned  || false,
+        gender:        socket.gender        || 'unspecified',
+        genderPref:    socket.genderPref    || 'anyone',
+        status:        'connecting',     // connecting | waiting | in-call
+        pairedWith:    null,             // socketId of partner
         pairedUsername: null,
-        joinedAt:     Date.now(),
+        joinedAt:      Date.now(),
     })
+}
+
+export function updateGenderPref(socketId, genderPref) {
+    const user = registry.get(socketId)
+    if (!user) return
+    registry.set(socketId, { ...user, genderPref })
 }
 
 export function updateStatus(socketId, status, pairedWith = null, pairedUsername = null) {

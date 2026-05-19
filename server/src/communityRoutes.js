@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { v4 as uuid } from 'uuid'
+import jwt from 'jsonwebtoken'
 import client from './redisClient.js'
 
 const router = Router()
@@ -52,16 +53,28 @@ router.get('/channels', async (req, res) => {
         }))
         res.json(channels.filter(c => c.id))
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[community/channels GET]', err)
+        res.status(500).json({ error: 'Failed to load channels.' })
     }
 })
 
 // ── POST /community/channels ──────────────────────────────────
-// Create a new channel
+// Create a new channel — requires a valid JWT (verified college student)
 router.post('/channels', async (req, res) => {
     try {
-        const { name, description, emoji, username } = req.body
-        if (!name || !username) return res.status(400).json({ error: 'Name and username required' })
+        // Authenticate: extract username from verified JWT, not from request body
+        const token = req.headers.authorization?.split(' ')[1]
+        if (!token) return res.status(401).json({ error: 'Login required to create a channel' })
+        let jwtUser
+        try {
+            jwtUser = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
+        } catch {
+            return res.status(401).json({ error: 'Invalid or expired token' })
+        }
+
+        const { name, description, emoji } = req.body
+        const username = jwtUser.username   // always from verified JWT
+        if (!name) return res.status(400).json({ error: 'Channel name is required' })
 
         const clean = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)
         if (clean.length < 2) return res.status(400).json({ error: 'Name too short' })
@@ -87,19 +100,30 @@ router.post('/channels', async (req, res) => {
 
         res.json({ success: true, id, name: clean })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[community/channels POST]', err)
+        res.status(500).json({ error: 'Failed to create channel.' })
     }
 })
 
 // ── GET /community/channels/:id/messages ──────────────────────
-// Last 60 messages in a channel
+// Last 60 messages in a channel — email field stripped before sending to client
 router.get('/channels/:id/messages', async (req, res) => {
     try {
-        const raw  = await client.lRange(`channel:messages:${req.params.id}`, -60, -1)
-        const msgs = raw.map(m => JSON.parse(m))
+        // Validate channelId format before using in Redis key
+        const channelId = req.params.id
+        if (!/^[a-z0-9-]{2,32}$/.test(channelId)) {
+            return res.status(400).json({ error: 'Invalid channel ID' })
+        }
+        const raw  = await client.lRange(`channel:messages:${channelId}`, -60, -1)
+        // Strip email from every message before sending — never expose user emails publicly
+        const msgs = raw.map(m => {
+            const { email, ...safe } = JSON.parse(m)
+            return safe
+        })
         res.json(msgs)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[community/messages]', err)
+        res.status(500).json({ error: 'Failed to load messages.' })
     }
 })
 
@@ -116,7 +140,8 @@ router.get('/karma/:socketId', async (req, res) => {
             disrespectful: parseInt(raw.disrespectful || 0),
         })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('[community/karma]', err)
+        res.status(500).json({ error: 'Failed to load karma.' })
     }
 })
 

@@ -316,10 +316,9 @@ export default function ChatPage() {
               💬 {chatTitle}
             </span>
             <button
-              className="nav-ico"
+              className="msg-drawer-close"
               onClick={() => setChatOpen(false)}
-              title="Close"
-              style={{ fontSize: 16 }}
+              title="Close chat"
             >
               ✕
             </button>

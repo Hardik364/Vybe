@@ -407,53 +407,42 @@
 /* ── CHAT LAYOUT (video-first) ─────────────────────────────────── */
 .chat-layout {
   position: relative; flex: 1; overflow: hidden;
-  /* no padding — video fills edge to edge */
 }
 
-/* ── VIDEO PANEL: fills the entire layout area ── */
+/* ── VIDEO PANEL: fills the entire layout, stacks videos vertically ── */
 .video-panel {
   position: absolute; inset: 0;
-  display: block; overflow: hidden;
-  background: var(--bg-base);
+  display: flex; flex-direction: column;
+  overflow: hidden; background: oklch(4% 0.01 265);
 }
 
-/* Remote video: full background */
+/* Remote video: large upper portion (~65%) */
 .video-remote-wrap {
-  position: absolute; inset: 0; z-index: 1;
+  flex: 2.2; min-height: 0; position: relative; overflow: hidden;
 }
 .video-remote-wrap .video-slot {
+  position: absolute; inset: 0;
   width: 100%; height: 100%;
   flex: none; min-height: unset;
   border: none; border-radius: 0; box-shadow: none;
-  background: var(--bg-base);
+  background: oklch(4% 0.01 265);
 }
 .video-remote-wrap .video-slot:hover { border-color: transparent; }
 
-/* Local video: PiP corner */
+/* Local video: visible bottom strip (~35%, max 200px) */
 .video-local-wrap {
-  position: absolute; bottom: 20px; left: 20px;
-  width: 188px; height: 136px; z-index: 6;
-  border-radius: var(--r-md); overflow: hidden;
-  border: 2px solid oklch(100% 0 0 / 0.18);
-  box-shadow: var(--sh-md);
-  transition: all var(--t-base);
+  flex: 1; min-height: 100px; max-height: 200px;
+  position: relative; overflow: hidden;
+  border-top: 1px solid oklch(100% 0 0 / 0.08);
 }
-.video-local-wrap:hover { border-color: var(--accent); }
 .video-local-wrap .video-slot {
+  position: absolute; inset: 0;
   width: 100%; height: 100%;
   flex: none; min-height: unset;
   border: none; border-radius: 0; box-shadow: none;
+  background: oklch(8% 0.014 265);  /* slightly lighter so you can see it */
 }
 .video-local-wrap .video-slot:hover { border-color: transparent; }
-/* Hide verbose PiP controls on hover, show compact icons only */
-.video-local-wrap .video-ph { font-size: 11px; gap: 6px; }
-.video-local-wrap .video-ph-ico { width: 36px; height: 36px; font-size: 17px; }
-/* Compact bottom controls inside PiP */
-.video-local-wrap [style*="bottom: 10px"] {
-  bottom: 6px !important;
-  gap: 4px !important;
-}
-.video-local-wrap button { padding: 3px 7px !important; font-size: 10px !important; }
 
 /* Shared video slot base */
 .video-slot {
@@ -531,6 +520,18 @@
   font-size: 13px; font-weight: 700; color: var(--t1);
   display: flex; align-items: center; gap: 8px;
 }
+.msg-drawer-close {
+  width: 32px; height: 32px; border-radius: var(--r-full);
+  border: 1px solid var(--border); color: var(--t2);
+  background: var(--bg-float); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; line-height: 1;
+  transition: all var(--t-fast); flex-shrink: 0;
+  /* explicit z-index so nothing can sit on top of it inside the drawer */
+  position: relative; z-index: 1;
+}
+.msg-drawer-close:hover,
+.msg-drawer-close:active { border-color: var(--red); color: var(--red); background: var(--red-sub); }
 
 /* Backdrop — only visible on mobile */
 .msg-drawer-backdrop {
@@ -756,8 +757,8 @@
   /* Signup: shrink form panel */
   .signup-form-panel { width: 380px; padding: 40px 32px; }
 
-  /* Chat: video fills, PiP slightly smaller */
-  .video-local-wrap { width: 156px; height: 114px; }
+  /* Chat: local video strip slightly smaller on tablet */
+  .video-local-wrap { max-height: 170px; }
 
   /* Account: shrink left col */
   .acc-left { width: 340px; min-width: 300px; }
@@ -793,13 +794,10 @@
   /* ── Chat layout: video fills screen, chat is bottom sheet ── */
   .chat-layout { padding: 0; }
 
-  /* PiP: smaller, sits above FAB */
-  .video-local-wrap {
-    width: 114px; height: 84px;
-    bottom: 82px; left: 12px;
-  }
+  /* Local video strip: smaller on mobile */
+  .video-local-wrap { max-height: 140px; min-height: 80px; }
 
-  /* FAB: smaller */
+  /* FAB: slightly smaller */
   .chat-fab {
     bottom: 18px; right: 16px;
     width: 50px; height: 50px; font-size: 20px;
@@ -863,7 +861,7 @@
 @media (max-width: 400px) {
   .signup-form-panel { padding: 24px 16px; }
   .form-heading      { font-size: 22px; }
-  .video-local-wrap  { width: 96px; height: 72px; bottom: 74px; }
+  .video-local-wrap  { max-height: 100px; min-height: 70px; }
   .otp-box           { width: 36px; height: 44px; font-size: 18px; }
   .modal-card        { padding: 22px 14px; }
   .up-modal          { padding: 18px 12px; }

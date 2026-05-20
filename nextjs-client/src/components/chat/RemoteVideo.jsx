@@ -18,9 +18,46 @@ export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
         setHasStream(true)
       }
     }
-    // Cleanup: null the handler so it doesn't fire on the stale PC instance.
     return () => { peerConnection.ontrack = null }
   }, [peerConnection])
+
+  // ── Auto-resume if the browser pauses the video element ──────
+  // Background-tab throttling or a brief network hiccup can cause the
+  // <video> element to pause.  Resume it immediately so the remote
+  // stream keeps playing for the local user.
+  useEffect(() => {
+    const video = remoteVideoRef.current
+    if (!video) return
+
+    function resume() {
+      video.play().catch(() => {})
+    }
+
+    // Browser paused the element (e.g. tab hidden, low power mode)
+    video.addEventListener('pause',   resume)
+    // Stream stalled — no new data arrived for a moment
+    video.addEventListener('stalled', resume)
+    // Media playback was suspended by the browser
+    video.addEventListener('suspend', resume)
+
+    return () => {
+      video.removeEventListener('pause',   resume)
+      video.removeEventListener('stalled', resume)
+      video.removeEventListener('suspend', resume)
+    }
+  }, [])
+
+  // ── Restore playback when the user comes back to the tab ─────
+  useEffect(() => {
+    const video = remoteVideoRef.current
+    function onVisibilityChange() {
+      if (document.hidden || !video) return
+      // If the element was paused while the tab was hidden, un-pause it
+      if (video.paused) video.play().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
 
   return (
     <div className="video-slot">
@@ -32,7 +69,8 @@ export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
       )}
       <video
         ref={remoteVideoRef}
-        autoPlay playsInline
+        autoPlay
+        playsInline
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: hasStream ? 'block' : 'none' }}
       />
       <span className="video-lbl">👥 Stranger</span>

@@ -10,7 +10,8 @@ export default function LocalVideo({
   const [partnerVideoOn, setPartnerVideoOn] = useState(false)
   const [videoLoading,   setVideoLoading]   = useState(false)
   const [micMuted,       setMicMuted]       = useState(false)
-  const videoSenderRef = useRef(null)
+  const videoSenderRef  = useRef(null)
+  const keepAliveCtxRef = useRef(null)   // AudioContext keepalive
 
   // Audio-only stream on mount
   useEffect(() => {
@@ -27,6 +28,46 @@ export default function LocalVideo({
     init()
     return () => { if (inst) inst.getTracks().forEach(t => t.stop()) }
   }, [peerConnection])
+
+  // ── Keep the tab alive when minimised / hidden ───────────────
+  // Browsers throttle background tabs to ≤1 Hz, causing video encoding
+  // to freeze for the remote peer.  A silent AudioContext oscillator
+  // keeps the browser's media pipeline running at full speed regardless
+  // of tab visibility — standard "no-sleep" WebRTC technique.
+  useEffect(() => {
+    if (!stream) return
+    try {
+      const ctx  = new (window.AudioContext || window.webkitAudioContext)()
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      gain.gain.value = 0        // completely inaudible
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      keepAliveCtxRef.current = ctx
+    } catch {}
+    return () => {
+      keepAliveCtxRef.current?.close().catch(() => {})
+      keepAliveCtxRef.current = null
+    }
+  }, [stream])
+
+  // When the user comes back to the tab, nudge all live tracks so the
+  // encoder picks back up immediately (some browsers need this kick).
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.hidden || !stream) return
+      stream.getTracks().forEach(t => {
+        if (t.readyState === 'live') {
+          // toggling enabled off→on forces the encoder to wake up
+          t.enabled = false
+          t.enabled = true
+        }
+      })
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [stream])
 
   // Partner video events
   useEffect(() => {

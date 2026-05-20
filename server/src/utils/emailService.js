@@ -16,15 +16,15 @@ export async function sendOtpEmail(toEmail, otp, username) {
         },
         body: JSON.stringify({
             sender: {
-                name:  'UniBuddy',
+                name:  'OpenChat',
                 email: process.env.EMAIL_USER,   // your verified Gmail in Brevo
             },
             to: [{ email: toEmail }],
-            subject: `${otp} is your UniBuddy verification code`,
+            subject: `${otp} is your OpenChat verification code`,
             htmlContent: `
             <div style="font-family: Inter, Arial, sans-serif; background: #0D0D0D; color: #fff; padding: 40px; border-radius: 16px; max-width: 480px; margin: 0 auto;">
                 <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">
-                    <span style="color: #6C63FF;">✦</span> UniBuddy
+                    <span style="color: #6C63FF;">✦</span> OpenChat
                 </div>
                 <p style="color: #A0A0A0; margin-bottom: 32px;">Real conversations. Your college.</p>
 

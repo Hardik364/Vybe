@@ -145,7 +145,7 @@ export default function CommunityPage() {
             onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
             onMouseLeave={e => e.currentTarget.style.opacity = ''}
           >
-            UniBuddy 💬
+            OpenChat 💬
           </button>
           <span style={{ fontSize: 10, fontWeight: 900, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '1px' }}>
             Community

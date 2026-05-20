@@ -53,9 +53,11 @@ export async function upsertUser({ email, username, collegeDomain, state = null,
              RETURNING *`,
             [email, username, collegeDomain, state || null, gender || null]
         )
+        console.log(`[DB] upsertUser OK — ${email} (${collegeDomain})`)
         return rows[0] || null
     } catch (err) {
-        console.error('[DB] upsertUser:', err.message)
+        console.error('[DB] ❌ upsertUser FAILED:', err.message)
+        console.error('[DB]    email:', email, '| column issue or connection problem')
         return null
     }
 }

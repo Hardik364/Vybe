@@ -1,7 +1,7 @@
 import SignUpPage from '@/components/signup/SignUpPage'
 
 export const metadata = {
-  title: 'UniBuddy — Sign Up',
+  title: 'OpenChat — Sign Up',
 }
 
 export default function Page() {

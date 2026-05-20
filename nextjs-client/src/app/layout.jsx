@@ -9,7 +9,7 @@ export const viewport = {
 }
 
 export const metadata = {
-  title: 'Vybe — Connect with strangers who get it.',
+  title: 'OpenChat — Connect with strangers who get it.',
   description: 'Match with people for real voice conversations. Open to everyone.',
 }
 

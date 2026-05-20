@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     college_domain  TEXT,                          -- e.g. "iitb.ac.in"
     college_name    TEXT,                          -- e.g. "IIT Bombay"
     city            TEXT,                          -- for Plus tier city matching
+    gender          TEXT DEFAULT 'unspecified',    -- 'male' | 'female' | 'transgender' | 'unspecified'
     abc_status      TEXT DEFAULT 'none',           -- 'none' | 'pending' | 'verified'
     abc_hash        TEXT,                          -- SHA-256 of ABC ID, never raw
     tier            TEXT DEFAULT 'free',           -- 'free' | 'plus' | 'pro'

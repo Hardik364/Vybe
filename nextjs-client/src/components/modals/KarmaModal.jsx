@@ -1,12 +1,17 @@
 'use client'
+import { useState } from 'react'
 
 export default function KarmaModal({ strangerUsername, strangerUserId, socket, onRate }) {
+  const [rated, setRated] = useState(false)
+
   function rate(r) {
-    // Use socket — the rateUser handler checks partnership and updates karma in Redis
+    if (rated) return
+    setRated(true)
     if (socket && strangerUserId) {
       socket.emit('rateUser', { to: strangerUserId, rating: r })
     }
-    onRate()
+    // Brief delay so user sees the button state change before modal closes
+    setTimeout(onRate, 300)
   }
 
   const BTNS = [
@@ -30,13 +35,17 @@ export default function KarmaModal({ strangerUsername, strangerUserId, socket, o
             <button
               key={b.key}
               onClick={() => rate(b.key)}
+              disabled={rated}
               className="karma-btn"
+              style={rated ? { opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
               onMouseEnter={e => {
+                if (rated) return
                 e.currentTarget.style.borderColor = b.hoverColor
                 e.currentTarget.style.color = b.hoverColor
                 e.currentTarget.style.background = b.hoverBg
               }}
               onMouseLeave={e => {
+                if (rated) return
                 e.currentTarget.style.borderColor = ''
                 e.currentTarget.style.color = ''
                 e.currentTarget.style.background = ''
@@ -49,15 +58,17 @@ export default function KarmaModal({ strangerUsername, strangerUserId, socket, o
         </div>
 
         <button
-          onClick={onRate}
+          onClick={() => { if (!rated) { setRated(true); setTimeout(onRate, 100) } }}
+          disabled={rated}
           style={{
-            fontSize: 13, color: 'var(--t4)', cursor: 'pointer',
+            fontSize: 13, color: 'var(--t4)', cursor: rated ? 'not-allowed' : 'pointer',
             background: 'none', border: 'none',
             textDecoration: 'underline', textUnderlineOffset: 3,
             padding: '8px', marginTop: 4, transition: 'color var(--t-fast)',
+            opacity: rated ? 0.4 : 1,
           }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--t3)'}
-          onMouseLeave={e => e.currentTarget.style.color = ''}
+          onMouseEnter={e => { if (!rated) e.currentTarget.style.color = 'var(--t3)' }}
+          onMouseLeave={e => { if (!rated) e.currentTarget.style.color = '' }}
         >
           Skip rating
         </button>

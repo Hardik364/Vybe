@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenChat Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0f14;
+    --bg-card:  #161921;
+    --bg-input: #1e222d;
+    --border:   #2a2f3d;
+    --accent:   #6c63ff;
+    --accent2:  #ff6584;
+    --green:    #34d399;
+    --yellow:   #fbbf24;
+    --red:      #f87171;
+    --t1:       #f1f5f9;
+    --t2:       #94a3b8;
+    --t3:       #4b5563;
+    --r:        10px;
+    --sh:       0 4px 24px rgba(0,0,0,.45);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--t1);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── Login screen ── */
+  #login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .login-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 40px 48px;
+    width: 360px;
+    box-shadow: var(--sh);
+    text-align: center;
+  }
+  .login-box h1 { font-size: 22px; margin-bottom: 6px; }
+  .login-box p  { color: var(--t2); font-size: 13px; margin-bottom: 24px; }
+  .login-box input {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--t1); font-size: 14px;
+    margin-bottom: 12px; outline: none;
+    transition: border-color .15s;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  .login-box button {
+    width: 100%; padding: 11px;
+    background: var(--accent); border: none;
+    border-radius: 8px; color: #fff;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .login-box button:hover { opacity: .88; }
+  #login-err { color: var(--red); font-size: 13px; margin-top: 10px; }
+
+  /* ── Main layout ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: var(--bg-card); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar .brand { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .topbar .brand span { background: var(--accent); border-radius: 6px; padding: 2px 8px; font-size: 11px; }
+  .topbar .right { display: flex; align-items: center; gap: 12px; }
+  .badge { background: var(--bg-input); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--t2); }
+  .badge.live { border-color: var(--green); color: var(--green); }
+  #logout-btn {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--t2); font-size: 13px; cursor: pointer;
+    transition: all .15s;
+  }
+  #logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* Content */
+  .content { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+  /* Stat cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 18px 20px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--t2); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-card .value.green { color: var(--green); }
+  .stat-card .value.yellow { color: var(--yellow); }
+  .stat-card .value.red   { color: var(--red); }
+  .stat-card .value.blue  { color: var(--accent); }
+
+  /* Sections */
+  .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .sections { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--r); overflow: hidden;
+  }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 13px;
+  }
+  .card-head .count {
+    background: var(--bg-input); border-radius: 12px;
+    padding: 2px 8px; font-size: 11px; color: var(--t2);
+  }
+  .card-body { padding: 14px 18px; }
+
+  /* User table */
+  .user-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .user-table th {
+    text-align: left; color: var(--t2); font-weight: 600;
+    padding: 0 8px 10px; text-transform: uppercase; font-size: 10px; letter-spacing: .6px;
+  }
+  .user-table td { padding: 8px; border-top: 1px solid var(--border); vertical-align: middle; }
+  .user-table tr:hover td { background: rgba(255,255,255,.02); }
+  .user-table tr.paired td { background: rgba(108,99,255,.06); }
+
+  .pill {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .pill.green  { background: rgba(52,211,153,.12); color: var(--green); }
+  .pill.yellow { background: rgba(251,191,36,.12);  color: var(--yellow); }
+  .pill.red    { background: rgba(248,113,113,.12); color: var(--red); }
+  .pill.purple { background: rgba(108,99,255,.15);  color: var(--accent); }
+  .pill.gray   { background: var(--bg-input);        color: var(--t2); }
+
+  /* Action buttons */
+  .act-btn {
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; transition: all .15s;
+    margin-right: 4px;
+  }
+  .act-btn.kick  { border-color: var(--yellow); color: var(--yellow); background: rgba(251,191,36,.08); }
+  .act-btn.kick:hover  { background: rgba(251,191,36,.2); }
+  .act-btn.ban   { border-color: var(--red);    color: var(--red);    background: rgba(248,113,113,.08); }
+  .act-btn.ban:hover   { background: rgba(248,113,113,.2); }
+  .act-btn.unshadow { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.08); }
+  .act-btn.unshadow:hover { background: rgba(108,99,255,.2); }
+
+  /* Controls */
+  .control-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .ctrl-input {
+    flex: 1; padding: 8px 12px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--t1); font-size: 13px; outline: none;
+    transition: border-color .15s;
+  }
+  .ctrl-input:focus { border-color: var(--accent); }
+  .ctrl-btn {
+    padding: 8px 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; transition: opacity .15s;
+  }
+  .ctrl-btn:hover { opacity: .85; }
+  .ctrl-btn.primary { background: var(--accent);  color: #fff; }
+  .ctrl-btn.danger  { background: var(--red);     color: #fff; }
+  .ctrl-btn.safe    { background: var(--green);   color: #111; }
+
+  /* Banned list */
+  .banned-list { max-height: 180px; overflow-y: auto; margin-top: 10px; }
+  .banned-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  }
+  .banned-item:hover { background: var(--bg-input); }
+  .banned-item .unban-x {
+    cursor: pointer; color: var(--t3); font-size: 14px;
+    padding: 2px 6px; border-radius: 4px; border: none;
+    background: none; transition: color .15s;
+  }
+  .banned-item .unban-x:hover { color: var(--red); }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--sh); transition: transform .25s ease;
+    pointer-events: none; z-index: 999;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok   { border-color: var(--green); color: var(--green); }
+  #toast.err  { border-color: var(--red);   color: var(--red); }
+
+  /* Server info */
+  .info-row { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--t2); margin-bottom: 6px; }
+  .info-row strong { color: var(--t1); font-weight: 600; }
+
+  /* Scrollable table wrapper */
+  .table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+
+  /* Full-width card */
+  .card.full { margin-top: 20px; }
+
+  /* Refresh indicator */
+  #refresh-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .3; }
+  }
+
+  /* Empty state */
+  .empty { text-align: center; color: var(--t3); padding: 28px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ── Login Screen ─────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🔐 OpenChat Admin</h1>
+    <p>Enter your admin key to continue</p>
+    <input id="key-input" type="password" placeholder="Admin key" autocomplete="current-password" />
+    <button onclick="doLogin()">Sign In</button>
+    <div id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── Main App ─────────────────────────────────────── -->
+<div id="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="brand">
+      <span>ADMIN</span>
+      OpenChat Dashboard
+    </div>
+    <div class="right">
+      <div class="badge live">
+        <span id="refresh-dot"></span>
+        &nbsp;Live — refreshes every 5s
+      </div>
+      <div class="badge" id="uptime-badge">—</div>
+      <button id="logout-btn" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Stat cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Connected</div>
+        <div class="value green" id="s-connected">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Waiting</div>
+        <div class="value blue" id="s-inQueue">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Active Calls</div>
+        <div class="value purple" id="s-inCall">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Shadow Banned</div>
+        <div class="value yellow" id="s-shadow">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Suspended</div>
+        <div class="value yellow" id="s-suspended">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Banned Emails</div>
+        <div class="value red" id="s-banned">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Server Mem</div>
+        <div class="value" id="s-mem">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">PID</div>
+        <div class="value" id="s-pid">—</div>
+      </div>
+    </div>
+
+    <!-- Two-column sections -->
+    <div class="sections">
+
+      <!-- Live users -->
+      <div class="card">
+        <div class="card-head">
+          Live Users
+          <span class="count" id="users-count">0</span>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="user-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Gender</th>
+                  <th>College</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="5" class="empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Moderation tools -->
+      <div class="card">
+        <div class="card-head">Moderation Tools</div>
+        <div class="card-body">
+
+          <!-- Ban by email -->
+          <p style="font-size:12px; color:var(--t2); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;">Ban Email</p>
+          <div class="control-row">
+            <input class="ctrl-input" id="ban-email" type="email" placeholder="user@college.edu" />
+            <button class="ctrl-btn danger" onclick="doBan()">Ban</button>
+          </div>
+
+          <!-- Unban by email -->
+          <p style="font-size:12px; color:var(--t2); margin-bottom:8px; margin-top:16px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;">Unban Email</p>
+          <div class="control-row">
+            <input class="ctrl-input" id="unban-email" type="email" placeholder="user@college.edu" />
+            <button class="ctrl-btn safe" onclick="doUnban()">Unban</button>
+          </div>
+
+          <!-- Unshadow by socket -->
+          <p style="font-size:12px; color:var(--t2); margin-bottom:8px; margin-top:16px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;">Remove Shadow Ban</p>
+          <div class="control-row">
+            <input class="ctrl-input" id="unshadow-id" type="text" placeholder="Socket ID" />
+            <button class="ctrl-btn primary" onclick="doUnshadow()">Unshadow</button>
+          </div>
+
+          <!-- Banned emails list -->
+          <p style="font-size:12px; color:var(--t2); margin-bottom:8px; margin-top:20px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;">
+            Recently Banned
+            <span class="count" id="banned-count" style="margin-left:6px;">0</span>
+          </p>
+          <div class="banned-list" id="banned-list">
+            <div class="empty">None</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sections -->
+
+    <!-- Full-width: all live sockets detail -->
+    <div class="card full">
+      <div class="card-head">
+        All Connected Sockets (detail)
+        <span class="count" id="sockets-count">0</span>
+      </div>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>Socket ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Gender</th>
+                <th>Pref</th>
+                <th>Domain</th>
+                <th>Guest</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sockets-tbody">
+              <tr><td colspan="9" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server info -->
+    <div class="card full" style="margin-top:20px;">
+      <div class="card-head">Server Info</div>
+      <div class="card-body" id="server-info">—</div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────
+  let ADMIN_KEY = ''
+  let pollTimer = null
+  let lastData  = null
+
+  // Derive the API base from where this page is served
+  // Works whether the panel is at /admin-panel or a custom domain
+  const API = window.location.origin
+
+  // ── Auth ───────────────────────────────────────────────────────
+  function doLogin() {
+    const key = document.getElementById('key-input').value.trim()
+    if (!key) return showLoginErr('Enter your admin key')
+    ADMIN_KEY = key
+    // Test with a real request
+    fetchDashboard().then(data => {
+      if (data) {
+        document.getElementById('login-screen').style.display = 'none'
+        document.getElementById('app').style.display = 'flex'
+        document.getElementById('app').style.flexDirection = 'column'
+        startPoll()
+      }
+    })
+  }
+
+  function doLogout() {
+    ADMIN_KEY = ''
+    stopPoll()
+    document.getElementById('login-screen').style.display = 'flex'
+    document.getElementById('app').style.display = 'none'
+    document.getElementById('key-input').value = ''
+    document.getElementById('login-err').textContent = ''
+  }
+
+  function showLoginErr(msg) {
+    document.getElementById('login-err').textContent = msg
+  }
+
+  // ── Polling ────────────────────────────────────────────────────
+  function startPoll() {
+    fetchAndRender()
+    pollTimer = setInterval(fetchAndRender, 5000)
+  }
+  function stopPoll() {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+
+  async function fetchDashboard() {
+    try {
+      const r = await fetch(`${API}/admin/dashboard`, {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      })
+      if (r.status === 403) { showLoginErr('Invalid admin key'); ADMIN_KEY = ''; return null }
+      if (!r.ok) throw new Error(await r.text())
+      return await r.json()
+    } catch (e) {
+      showLoginErr('Connection error: ' + e.message)
+      return null
+    }
+  }
+
+  async function fetchAndRender() {
+    const data = await fetchDashboard()
+    if (!data) return
+    lastData = data
+    render(data)
+  }
+
+  // ── Render ─────────────────────────────────────────────────────
+  function render(data) {
+    const { stats, users, banned, server } = data
+
+    // Stat cards
+    // stats keys: connected, waiting, activeCalls, shadowed (registry)
+    //             shadowBanned, suspended, bannedEmails (Redis)
+    set('s-connected', stats.connected   ?? '—')
+    set('s-inQueue',   stats.waiting     ?? '—')
+    set('s-inCall',    stats.activeCalls ?? '—')
+    set('s-shadow',    stats.shadowBanned  ?? '—')
+    set('s-suspended', stats.suspended     ?? '—')
+    set('s-banned',    stats.bannedEmails  ?? '—')
+    set('s-mem',       server.memory  ?? '—')
+    set('s-pid',       server.pid     ?? '—')
+    set('uptime-badge', '⏱ ' + (server.uptime ?? '—'))
+
+    // Users table (compact)
+    const tbody = document.getElementById('users-tbody')
+    set('users-count', users.length)
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No users connected</td></tr>'
+    } else {
+      tbody.innerHTML = users.map(u => `
+        <tr class="${u.status === 'in-call' ? 'paired' : ''}">
+          <td><strong>${esc(u.username)}</strong></td>
+          <td>${statusPill(u.status)}</td>
+          <td><span style="font-size:11px">${esc(u.gender || '—')}</span></td>
+          <td style="font-size:11px;color:var(--t2)">${esc(u.collegeDomain || '—')}</td>
+          <td>
+            <button class="act-btn kick" onclick="doKick('${esc(u.socketId)}')">Kick</button>
+            ${u.email ? `<button class="act-btn ban" onclick="quickBan('${esc(u.email)}')">Ban</button>` : ''}
+          </td>
+        </tr>
+      `).join('')
+    }
+
+    // Sockets detail table
+    const stbody = document.getElementById('sockets-tbody')
+    set('sockets-count', users.length)
+    if (!users.length) {
+      stbody.innerHTML = '<tr><td colspan="9" class="empty">No sockets</td></tr>'
+    } else {
+      stbody.innerHTML = users.map(u => `
+        <tr class="${u.status === 'in-call' ? 'paired' : ''}">
+          <td style="font-size:10px;font-family:monospace;color:var(--t2)">${esc(u.socketId)}</td>
+          <td><strong>${esc(u.username)}</strong></td>
+          <td style="font-size:11px">${esc(u.email || '—')}</td>
+          <td>${statusPill(u.status)}</td>
+          <td style="font-size:11px">${esc(u.gender || '—')}</td>
+          <td style="font-size:11px">${esc(u.genderPref || '—')}</td>
+          <td style="font-size:11px;color:var(--t2)">${esc(u.collegeDomain || '—')}</td>
+          <td>${u.isGuest ? '<span class="pill yellow">Guest</span>' : '<span class="pill gray">Auth</span>'}</td>
+          <td>
+            <button class="act-btn kick" onclick="doKick('${esc(u.socketId)}')">Kick</button>
+            <button class="act-btn unshadow" onclick="doUnshadowId('${esc(u.socketId)}')">Unshadow</button>
+            ${u.email ? `<button class="act-btn ban" onclick="quickBan('${esc(u.email)}')">Ban</button>` : ''}
+          </td>
+        </tr>
+      `).join('')
+    }
+
+    // Banned list
+    const bl = document.getElementById('banned-list')
+    set('banned-count', banned.length)
+    if (!banned.length) {
+      bl.innerHTML = '<div class="empty">No banned emails</div>'
+    } else {
+      bl.innerHTML = banned.map(email => `
+        <div class="banned-item">
+          <span>${esc(email)}</span>
+          <button class="unban-x" onclick="quickUnban('${esc(email)}')" title="Unban">✕</button>
+        </div>
+      `).join('')
+    }
+
+    // Server info
+    const si = document.getElementById('server-info')
+    si.innerHTML = `
+      <div class="info-row">🕐 Uptime: <strong>${esc(server.uptime)}</strong></div>
+      <div class="info-row">💾 Memory: <strong>${esc(server.memory)}</strong></div>
+      <div class="info-row">🔢 PID: <strong>${esc(String(server.pid))}</strong></div>
+      <div class="info-row">🕑 Last refresh: <strong>${new Date().toLocaleTimeString()}</strong></div>
+    `
+  }
+
+  // ── Actions ────────────────────────────────────────────────────
+  async function doKick(socketId) {
+    if (!socketId) return
+    if (!confirm(`Kick socket ${socketId}?`)) return
+    const r = await adminPost('/admin/kick', { socketId })
+    if (r?.success) toast('Kicked ' + socketId, 'ok')
+    else toast('Kick failed', 'err')
+    fetchAndRender()
+  }
+
+  async function doBan() {
+    const email = document.getElementById('ban-email').value.trim()
+    if (!email) return toast('Enter an email', 'err')
+    if (!isValidEmail(email)) return toast('Invalid email format', 'err')
+    if (!confirm(`Ban ${email}?`)) return
+    const r = await adminPost('/admin/ban', { email })
+    if (r?.success) { toast('Banned ' + email, 'ok'); document.getElementById('ban-email').value = '' }
+    else toast('Ban failed', 'err')
+    fetchAndRender()
+  }
+
+  async function doUnban() {
+    const email = document.getElementById('unban-email').value.trim()
+    if (!email) return toast('Enter an email', 'err')
+    if (!isValidEmail(email)) return toast('Invalid email format', 'err')
+    const r = await adminPost('/admin/unban', { email })
+    if (r?.success) { toast('Unbanned ' + email, 'ok'); document.getElementById('unban-email').value = '' }
+    else toast('Unban failed', 'err')
+    fetchAndRender()
+  }
+
+  async function doUnshadow() {
+    const socketId = document.getElementById('unshadow-id').value.trim()
+    if (!socketId) return toast('Enter a socket ID', 'err')
+    const r = await adminPost('/admin/unshadow', { socketId })
+    if (r?.success) { toast('Shadow ban removed', 'ok'); document.getElementById('unshadow-id').value = '' }
+    else toast('Failed', 'err')
+    fetchAndRender()
+  }
+
+  async function doUnshadowId(socketId) {
+    const r = await adminPost('/admin/unshadow', { socketId })
+    if (r?.success) toast('Shadow ban removed', 'ok')
+    else toast('Failed', 'err')
+    fetchAndRender()
+  }
+
+  async function quickBan(email) {
+    if (!confirm(`Ban ${email}?`)) return
+    const r = await adminPost('/admin/ban', { email })
+    if (r?.success) toast('Banned ' + email, 'ok')
+    else toast('Ban failed', 'err')
+    fetchAndRender()
+  }
+
+  async function quickUnban(email) {
+    const r = await adminPost('/admin/unban', { email })
+    if (r?.success) toast('Unbanned ' + email, 'ok')
+    else toast('Unban failed', 'err')
+    fetchAndRender()
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────
+  async function adminPost(path, body) {
+    try {
+      const r = await fetch(`${API}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify(body)
+      })
+      return await r.json()
+    } catch (e) {
+      toast('Network error', 'err')
+      return null
+    }
+  }
+
+  function set(id, val) {
+    const el = document.getElementById(id)
+    if (el) el.textContent = val
+  }
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
+  function statusPill(s) {
+    // Match actual registry status values: connecting | waiting | in-call
+    const map = {
+      'in-call':    ['purple', 'In Call'],
+      'waiting':    ['yellow', 'Waiting'],
+      'connecting': ['gray',   'Connecting'],
+    }
+    const [cls, label] = map[s] || ['gray', s || 'Unknown']
+    return `<span class="pill ${cls}">${label}</span>`
+  }
+
+  function isValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) }
+
+  let toastTimer = null
+  function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast')
+    el.textContent = msg
+    el.className = `show ${type}`
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { el.className = '' }, 3000)
+  }
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────
+  document.getElementById('key-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin()
+  })
+</script>
+</body>
+</html>

@@ -26,6 +26,8 @@ export default function InputBar({ socket, setMessage, onNewUser, strangerUserId
           onChange={e => setInput(e.target.value)}
           placeholder={strangerUserId ? '💬 Type a message…' : '🔍 Waiting for a match…'}
           disabled={!strangerUserId}
+          inputMode="text"
+          autoComplete="off"
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
             fontSize: 14, color: 'var(--t1)', padding: '8px 4px', minWidth: 0,

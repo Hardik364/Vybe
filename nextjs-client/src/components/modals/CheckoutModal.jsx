@@ -49,7 +49,7 @@ export default function CheckoutModal({ selectedPlan, onSuccess, onClose }) {
 
     const rzp = new window.Razorpay({
       key: orderData.keyId, amount: orderData.amount, currency: orderData.currency,
-      name: 'UniBuddy', description: `${plan.label} — ${plan.duration}`,
+      name: 'OpenChat', description: `${plan.label} — ${plan.duration}`,
       order_id: orderData.orderId, theme: { color: '#7c3aed' },
       modal: { ondismiss: () => setStep('confirm') },
       handler: async (response) => {

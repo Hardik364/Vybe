@@ -1,9 +1,9 @@
-// UniBuddy Service Worker — Web Push support
+// OpenChat Service Worker — Web Push support
 self.addEventListener('push', event => {
   if (!event.data) return
   const data = event.data.json()
   event.waitUntil(
-    self.registration.showNotification(data.title || 'UniBuddy 🎓', {
+    self.registration.showNotification(data.title || 'OpenChat 🎓', {
       body: data.body || 'Someone from your college just came online!',
       icon: '/icon-192.png',
       badge: '/icon-192.png',

@@ -30,7 +30,7 @@ export default function ChangeCam({ peerConnection, localVideoRef, show, setShow
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-over backdrop-blur-xl animate-fade-in">
-      <div className="bg-surf border border-bdr rounded-xl p-6 flex flex-col gap-4 w-80 shadow-lg animate-pop-in">
+      <div className="bg-surf border border-bdr rounded-xl p-6 flex flex-col gap-4 w-80 max-w-[calc(100vw-2rem)] shadow-lg animate-pop-in">
         <p className="text-[13px] font-semibold text-t2">📷 Select Camera</p>
         <video
           ref={previewRef}

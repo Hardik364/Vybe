@@ -27,3 +27,13 @@ export function cleanupPartnership(socketId) {
     }
     recentPartners.delete(socketId)
 }
+
+/**
+ * Remove only the A↔B link, leaving both sockets' other partners intact.
+ * Used after pairedUserLeftTheChat so stale partners can't receive
+ * strangerLeftTheChat during a later unrelated call.
+ */
+export function cleanupSpecificPartnership(idA, idB) {
+    recentPartners.get(idA)?.delete(idB)
+    recentPartners.get(idB)?.delete(idA)
+}

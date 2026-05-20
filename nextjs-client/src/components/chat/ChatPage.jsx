@@ -81,9 +81,15 @@ export default function ChatPage() {
   const [collegeDomain, setCollegeDomain]   = useState('launch')
   const [reportSent, setReportSent]         = useState(false)
   const [showAccount, setShowAccount]       = useState(false)
-  const [videoCollapsed, setVideoCollapsed] = useState(false)
+
+  // ── Chat drawer state ──────────────────────────────────────────
+  const [chatOpen, setChatOpen]     = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const prevMsgCount = useRef(0)
+
   const isMobile = useIsMobile(768)
-  const [genderPref, setGenderPref]         = useState(() => {
+
+  const [genderPref, setGenderPref] = useState(() => {
     if (typeof window === 'undefined') return 'anyone'
     return localStorage.getItem('ub_gender_pref') || 'anyone'
   })
@@ -143,6 +149,31 @@ export default function ChatPage() {
       .then(d => { if (d.valid && d.collegeDomain) setCollegeDomain(d.collegeDomain) })
       .catch(() => {})
   }, [])
+
+  // ── Track unread messages when drawer is closed ───────────────
+  useEffect(() => {
+    if (message.length > prevMsgCount.current) {
+      const incoming = message.length - prevMsgCount.current
+      // Only count messages that came from the stranger
+      if (!chatOpen) setUnreadCount(c => c + incoming)
+    }
+    prevMsgCount.current = message.length
+  }, [message])
+
+  // Reset unread count when drawer opens
+  useEffect(() => {
+    if (chatOpen) setUnreadCount(0)
+  }, [chatOpen])
+
+  // ── Reset chat drawer when stranger changes ───────────────────
+  useEffect(() => {
+    setUnreadCount(0)
+    prevMsgCount.current = 0
+  }, [strangerUserId])
+
+  function toggleChat() {
+    setChatOpen(o => !o)
+  }
 
   function handlePromptToggle() {
     if (!socket || !strangerUserId) return
@@ -205,6 +236,10 @@ export default function ChatPage() {
 
   if (!username) return null
 
+  const chatTitle = connectionStatus
+    ? `Chat with ${strangerUsername || 'Stranger'}`
+    : 'Chat'
+
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
       <Navbar
@@ -221,25 +256,11 @@ export default function ChatPage() {
         genderStats={genderStats}
       />
 
+      {/* ── Main content area ─────────────────────────────────── */}
       <div className="chat-layout">
-        {/* Mobile video toggle */}
-        {isMobile && (
-          <button
-            onClick={() => setVideoCollapsed(v => !v)}
-            style={{
-              position: 'absolute', top: 66, right: 12, zIndex: 10,
-              background: 'var(--bg-surf)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-full)', padding: '4px 10px',
-              fontSize: 11, fontWeight: 700, color: 'var(--t3)',
-              cursor: 'pointer', boxShadow: 'var(--sh-sm)',
-            }}
-          >
-            {videoCollapsed ? '📹 Show Video' : '🙈 Hide Video'}
-          </button>
-        )}
 
-        {/* Video panel */}
-        <div className="video-panel" style={isMobile && videoCollapsed ? { display: 'none' } : {}}>
+        {/* ── Video panel — fills the whole area ────────────── */}
+        <div className="video-panel">
           <ChangeCam
             peerConnection={peerConnection}
             localVideoRef={localVideoRef}
@@ -249,65 +270,113 @@ export default function ChatPage() {
             setSelectedDeviceId={setSelectedDeviceId}
             setStream={setStream}
           />
-          <LocalVideo
-            localVideoRef={localVideoRef}
-            peerConnection={peerConnection}
-            setChangeCamOverlay={setChangeCamOverlay}
-            setStream={setStream}
-            stream={stream}
-            selectedDeviceId={selectedDeviceId}
-            socket={socket}
-            strangerUserId={strangerUserId}
-          />
-          <RemoteVideo
-            remoteVideoRef={remoteVideoRef}
-            peerConnection={peerConnection}
-          />
-        </div>
 
-        {/* Message panel */}
-        <div className="msg-panel">
-          {activePrompt && (
-            <PromptCard
-              prompt={activePrompt}
-              onNext={handleNextPrompt}
-              onClose={handleDismissPrompt}
+          {/* Remote video: full background */}
+          <div className="video-remote-wrap">
+            <RemoteVideo
+              remoteVideoRef={remoteVideoRef}
+              peerConnection={peerConnection}
             />
-          )}
+          </div>
 
-          <MessageBox
-            messages={message}
-            username={username}
-            socket={socket}
-            setMessage={setMessage}
-            strangerUsername={strangerUsername}
-            strangerUserId={strangerUserId}
-            connectionStatus={connectionStatus}
-          />
-
-          {connectionStatus && (
-            <div className="report-bar">
-              <button
-                onClick={handleReport}
-                disabled={reportSent}
-                className={`report-btn${reportSent ? ' reported' : ''}`}
-              >
-                {reportSent ? '✅ Reported' : '🚩 Report'}
-              </button>
-            </div>
-          )}
-
-          {!connectionStatus && liveCount === 0 && <NotifyMe collegeDomain={collegeDomain} />}
-
-          <InputBar
-            socket={socket}
-            setMessage={setMessage}
-            onNewUser={handleNewUser}
-            strangerUserId={strangerUserId}
-            username={username}
-            strangerUsername={strangerUsername}
-          />
+          {/* Local video: picture-in-picture */}
+          <div className="video-local-wrap">
+            <LocalVideo
+              localVideoRef={localVideoRef}
+              peerConnection={peerConnection}
+              setChangeCamOverlay={setChangeCamOverlay}
+              setStream={setStream}
+              stream={stream}
+              selectedDeviceId={selectedDeviceId}
+              socket={socket}
+              strangerUserId={strangerUserId}
+            />
+          </div>
         </div>
+
+        {/* ── Chat FAB ───────────────────────────────────────── */}
+        <button
+          className="chat-fab"
+          onClick={toggleChat}
+          title={chatOpen ? 'Close Chat' : 'Open Chat'}
+        >
+          {chatOpen ? '✕' : '💬'}
+          {!chatOpen && unreadCount > 0 && (
+            <span className="chat-fab-badge">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* ── Message drawer ─────────────────────────────────── */}
+        <div className={`msg-drawer${chatOpen ? ' open' : ''}`}>
+          {/* Header */}
+          <div className="msg-drawer-head">
+            <span className="msg-drawer-title">
+              💬 {chatTitle}
+            </span>
+            <button
+              className="nav-ico"
+              onClick={() => setChatOpen(false)}
+              title="Close"
+              style={{ fontSize: 16 }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Content — re-uses all existing msg-panel children */}
+          <div className="msg-panel">
+            {activePrompt && (
+              <PromptCard
+                prompt={activePrompt}
+                onNext={handleNextPrompt}
+                onClose={handleDismissPrompt}
+              />
+            )}
+
+            <MessageBox
+              messages={message}
+              username={username}
+              socket={socket}
+              setMessage={setMessage}
+              strangerUsername={strangerUsername}
+              strangerUserId={strangerUserId}
+              connectionStatus={connectionStatus}
+            />
+
+            {connectionStatus && (
+              <div className="report-bar">
+                <button
+                  onClick={handleReport}
+                  disabled={reportSent}
+                  className={`report-btn${reportSent ? ' reported' : ''}`}
+                >
+                  {reportSent ? '✅ Reported' : '🚩 Report'}
+                </button>
+              </div>
+            )}
+
+            {!connectionStatus && liveCount === 0 && <NotifyMe collegeDomain={collegeDomain} />}
+
+            <InputBar
+              socket={socket}
+              setMessage={setMessage}
+              onNewUser={handleNewUser}
+              strangerUserId={strangerUserId}
+              username={username}
+              strangerUsername={strangerUsername}
+            />
+          </div>
+        </div>
+
+        {/* Backdrop — closes drawer on outside tap (mobile) */}
+        {chatOpen && (
+          <div
+            className="msg-drawer-backdrop"
+            onClick={() => setChatOpen(false)}
+          />
+        )}
       </div>
 
       {showPostCall && (

@@ -76,7 +76,7 @@ export default function UpgradeModal({ currentTier, onClose, onTierChange }) {
             ✕
           </button>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900, color: 'var(--t1)', marginBottom: 6 }}>
-            ⚡ Upgrade UniBuddy
+            ⚡ Upgrade OpenChat
           </h2>
           <p style={{ fontSize: 14, color: 'var(--t3)' }}>Unlock more conversations. Connect further.</p>
         </div>

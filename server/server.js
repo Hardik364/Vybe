@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import client from "./src/redisClient.js";
 import { handelSocketConnection } from "./src/socketRoutes.js";
 import authRoutes from "./src/authRoutes.js";
@@ -12,6 +14,9 @@ import communityRoutes from "./src/communityRoutes.js";
 import apiRoutes      from "./src/apiRoutes.js";
 import paymentRoutes  from "./src/paymentRoutes.js";
 import 'dotenv/config'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname  = dirname(__filename)
 
 const app = express();
 
@@ -95,6 +100,13 @@ io.use((socket, next) => {
       socket.username      = user.username
       socket.email         = user.email
       socket.collegeDomain = user.collegeDomain
+      // Guest JWTs carry isGuest + deviceId — must be extracted here, not in the
+      // no-token branch below, because guests DO have a token.
+      if (user.isGuest) {
+        socket.isGuest  = true
+        socket.deviceId = user.deviceId || socket.handshake.auth.deviceId || null
+        socket.guestIp  = socket.handshake.address
+      }
       return next()
     } catch {
       // Always reject invalid/expired tokens — no dev-mode bypass.
@@ -140,6 +152,14 @@ app.use('/admin', adminRoutes)
 app.use('/community', communityRoutes)
 app.use('/api', apiRoutes)
 app.use('/payments', paymentRoutes)
+
+// ── Standalone admin panel ────────────────────────────────────
+// Self-contained HTML/JS dashboard at /admin-panel
+// Auth is enforced entirely in the browser via x-admin-key header sent to /admin/*
+// No framework, no build step — just open the URL with a browser.
+app.get('/admin-panel', (req, res) => {
+  res.sendFile(join(__dirname, 'admin', 'index.html'))
+})
 
 // ── Health check (Render pings this to check if service is up) ──
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }))

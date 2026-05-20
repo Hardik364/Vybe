@@ -35,8 +35,8 @@ export default function Navbar({
 
       {/* ── Logo ── */}
       <div className="nav-logo" onClick={onCommunity}>
-        <div className="nav-logo-mark">V</div>
-        {!isMobile && 'Vybe'}
+        <div className="nav-logo-mark">O</div>
+        {!isMobile && 'OpenChat'}
       </div>
 
       {/* ── Center — stranger chip / searching + gender pref ── */}
@@ -58,8 +58,8 @@ export default function Navbar({
               animation: 'spinAnim .9s linear infinite', flexShrink: 0,
             }} />
             {isMobile
-              ? (liveCount > 0 ? `${liveCount} waiting…` : 'Searching…')
-              : (liveCount > 0 ? `${liveCount} people waiting…` : 'Finding your match…')
+              ? (liveCount > 0 ? `${liveCount} online` : 'Searching…')
+              : (liveCount > 0 ? `${liveCount} people online` : 'Finding your match…')
             }
           </div>
         )}

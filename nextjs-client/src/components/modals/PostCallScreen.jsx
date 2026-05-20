@@ -167,6 +167,8 @@ export default function PostCallScreen({ strangerUsername, strangerUserId, socke
             value={contactVal}
             onChange={e => setContactVal(e.target.value)}
             placeholder={contactTab === 'whatsapp' ? '9876543210' : 'username'}
+            inputMode={contactTab === 'whatsapp' ? 'numeric' : 'text'}
+            autoComplete={contactTab === 'whatsapp' ? 'tel' : 'username'}
             style={{
               flex: 1, background: 'none', border: 'none', outline: 'none',
               color: 'var(--t1)', fontSize: 14, padding: '12px 14px',

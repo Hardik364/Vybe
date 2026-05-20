@@ -2,7 +2,7 @@ import { processUserPairing, soloUserLeftTheChat, emitLiveCount, emitGenderStats
 // soloUserLeftTheChat is also called on disconnect to purge ghost queue entries
 import { registerUser, updateStatus, updateGenderPref, removeUser } from "./userRegistry.js"
 import registry from "./userRegistry.js"   // default export = the Map itself
-import { werePartnered, cleanupPartnership } from "./partnerships.js"
+import { werePartnered, cleanupPartnership, cleanupSpecificPartnership } from "./partnerships.js"
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -134,6 +134,12 @@ export async function handelSocketConnection(io, socket) {
         updateStatus(socket.id, 'waiting')
         updateStatus(to, 'waiting')
         emitLiveCount(io, socket)
+        // Schedule targeted cleanup after the post-call grace period.
+        // This prevents a stale partnership from leaking strangerLeftTheChat
+        // into a future unrelated call if the same socket pairs again quickly.
+        // 65 s = PostCallScreen 30 s + KarmaModal ~30 s + 5 s buffer.
+        const fromId = socket.id
+        setTimeout(() => cleanupSpecificPartnership(fromId, to), 65_000)
     })
 
     socket.on("soloUserLeftTheChat", () => {
@@ -389,6 +395,8 @@ export async function handelSocketConnection(io, socket) {
 
     socket.on('channel:leave', async ({ channelId }) => {
         if (!channelId) return
+        // Only decrement if the socket is actually in this channel room
+        if (!socket.rooms.has(`ch:${channelId}`)) return
         try {
             socket.leave(`ch:${channelId}`)
             await client.hIncrBy(`channel:${channelId}`, 'memberCount', -1)
@@ -418,6 +426,9 @@ export async function handelSocketConnection(io, socket) {
 
     socket.on('channel:message', async ({ channelId, content }) => {
         if (!channelId || !content?.trim()) return
+
+        // Must be a member of the channel — prevents any socket messaging arbitrary channels
+        if (!socket.rooms.has(`ch:${channelId}`)) return
 
         // Rate limit: 5 messages per 3 seconds
         if (isRateLimited(socket.id, 'channel:message')) {
@@ -465,22 +476,9 @@ export async function handelSocketConnection(io, socket) {
         }
     })
 
-    // Admin-only: delete a message via REST /admin endpoint instead of socket
-    // Kept here for backward compat but moves auth check to server-side only
-    socket.on('channel:delete_message', async ({ channelId, messageId }) => {
-        const adminKey = socket.handshake.auth.adminKey
-        if (!adminKey || adminKey !== process.env.ADMIN_KEY) return
-
-        try {
-            const raw  = await client.lRange(`channel:messages:${channelId}`, 0, -1)
-            const kept = raw.filter(m => JSON.parse(m).id !== messageId)
-            await client.del(`channel:messages:${channelId}`)
-            if (kept.length) await client.rPush(`channel:messages:${channelId}`, ...kept)
-            io.to(`ch:${channelId}`).emit('channel:messageDeleted', { channelId, messageId })
-        } catch (err) {
-            console.error('[channel:delete_message]', err)
-        }
-    })
+    // channel:delete_message has been removed from the socket layer.
+    // Use the authenticated REST endpoint: DELETE /admin/message
+    // (x-admin-key header required) — prevents admin key exposure in WS frames.
 
     // ── Disconnect cleanup ────────────────────────────────────
     socket.on('disconnect', async () => {

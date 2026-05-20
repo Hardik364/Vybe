@@ -133,6 +133,7 @@ export default function SignUpPage() {
   }
 
   function otpSent(email, name, ret) {
+    setLoading(false)   // reset before step change — prevents stuck spinner if user navigates back
     setPendingEmail(email); setPendingName(name)
     setIsRet(ret); setStep('otp'); setErr(''); setGuestErr('')
   }
@@ -147,8 +148,21 @@ export default function SignUpPage() {
 
   async function handleGuest() {
     setLoading(true)
+    // Generate or retrieve a persistent device ID so the server can track
+    // the one-free-call limit by device (survives tab closes, cookie clears won't help)
+    let deviceId = localStorage.getItem('ub_device_id')
+    if (!deviceId) {
+      deviceId = typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36)
+      localStorage.setItem('ub_device_id', deviceId)
+    }
     try {
-      const res  = await fetch(`${API}/auth/guest`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      const res  = await fetch(`${API}/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      })
       const data = await res.json()
       if (res.ok && data.token) {
         localStorage.setItem('ub_token', data.token)
@@ -187,7 +201,7 @@ export default function SignUpPage() {
           who get it.
         </h1>
         <p className="hero-desc">
-          UniBuddy matches you with people for real voice conversations that actually go somewhere. Open to everyone — just bring yourself.
+          OpenChat matches you with people for real voice conversations that actually go somewhere. Open to everyone — just bring yourself.
         </p>
 
         <div className="hero-stats">
@@ -233,8 +247,8 @@ export default function SignUpPage() {
         </div>
 
         <div className="form-logo">
-          <div className="form-logo-mark">U</div>
-          UniBuddy
+          <div className="form-logo-mark">O</div>
+          OpenChat
         </div>
 
         {guestDone && showTabs && (

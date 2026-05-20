@@ -416,9 +416,9 @@
   overflow: hidden; background: oklch(4% 0.01 265);
 }
 
-/* Remote video: large upper portion (~65%) */
+/* Remote video: equal half (50%) */
 .video-remote-wrap {
-  flex: 2.2; min-height: 0; position: relative; overflow: hidden;
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
 }
 .video-remote-wrap .video-slot {
   position: absolute; inset: 0;
@@ -429,9 +429,9 @@
 }
 .video-remote-wrap .video-slot:hover { border-color: transparent; }
 
-/* Local video: visible bottom strip (~35%, max 200px) */
+/* Local video: equal half (50%) — no max-height so it truly mirrors */
 .video-local-wrap {
-  flex: 1; min-height: 100px; max-height: 200px;
+  flex: 1; min-height: 100px;
   position: relative; overflow: hidden;
   border-top: 1px solid oklch(100% 0 0 / 0.08);
 }
@@ -757,8 +757,7 @@
   /* Signup: shrink form panel */
   .signup-form-panel { width: 380px; padding: 40px 32px; }
 
-  /* Chat: local video strip slightly smaller on tablet */
-  .video-local-wrap { max-height: 170px; }
+  /* tablet — keep 50/50 split, no override needed */
 
   /* Account: shrink left col */
   .acc-left { width: 340px; min-width: 300px; }
@@ -794,8 +793,8 @@
   /* ── Chat layout: video fills screen, chat is bottom sheet ── */
   .chat-layout { padding: 0; }
 
-  /* Local video strip: smaller on mobile */
-  .video-local-wrap { max-height: 140px; min-height: 80px; }
+  /* mobile — 50/50 split, just keep min-height so very small screens still usable */
+  .video-local-wrap { min-height: 80px; }
 
   /* FAB: slightly smaller */
   .chat-fab {
@@ -861,7 +860,7 @@
 @media (max-width: 400px) {
   .signup-form-panel { padding: 24px 16px; }
   .form-heading      { font-size: 22px; }
-  .video-local-wrap  { max-height: 100px; min-height: 70px; }
+  .video-local-wrap  { min-height: 60px; }
   .otp-box           { width: 36px; height: 44px; font-size: 18px; }
   .modal-card        { padding: 22px 14px; }
   .up-modal          { padding: 18px 12px; }

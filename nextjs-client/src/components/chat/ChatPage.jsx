@@ -166,7 +166,9 @@ export default function ChatPage() {
   }, [chatOpen])
 
   // ── Reset chat drawer when stranger changes ───────────────────
+  // Close the drawer and clear unread count so it always starts fresh
   useEffect(() => {
+    setChatOpen(false)
     setUnreadCount(0)
     prevMsgCount.current = 0
   }, [strangerUserId])
@@ -276,6 +278,8 @@ export default function ChatPage() {
             <RemoteVideo
               remoteVideoRef={remoteVideoRef}
               peerConnection={peerConnection}
+              socket={socket}
+              strangerUserId={strangerUserId}
             />
           </div>
 

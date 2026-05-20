@@ -1,45 +1,93 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
-export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
-  const [hasStream, setHasStream] = useState(false)
+export default function RemoteVideo({ remoteVideoRef, peerConnection, socket, strangerUserId }) {
+  const [hasStream,      setHasStream]      = useState(false)
+  // tracks whether the partner's video track is active (camera on vs camera off)
+  const [remoteVideoOn,  setRemoteVideoOn]  = useState(false)
 
-  // Reset the placeholder whenever the peer connection is replaced
-  // (which happens after every "Next" — clearState() creates a new PC).
+  // ── Clear everything when peer connection is replaced ─────────
+  // This fires after every "Next" so the frozen frame never persists
   useEffect(() => {
     setHasStream(false)
+    setRemoteVideoOn(false)
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
   }, [peerConnection])
 
+  // ── Also clear when stranger leaves (strangerUserId → null) ──
+  useEffect(() => {
+    if (!strangerUserId) {
+      setHasStream(false)
+      setRemoteVideoOn(false)
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
+    }
+  }, [strangerUserId])
+
+  // ── Handle incoming tracks ────────────────────────────────────
   useEffect(() => {
     if (!peerConnection) return
+
     peerConnection.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0]
-        setHasStream(true)
+      if (!remoteVideoRef.current) return
+      remoteVideoRef.current.srcObject = event.streams[0]
+      setHasStream(true)
+
+      // Watch the video track specifically — when the partner disables their
+      // camera the track is stopped/removed, which fires `ended`.
+      // We do NOT use `onmute` because that fires on brief network hiccups too.
+      const track = event.track
+      if (track.kind === 'video') {
+        setRemoteVideoOn(true)
+        track.onended = () => setRemoteVideoOn(false)
       }
     }
-    return () => { peerConnection.ontrack = null }
+
+    // ── ICE disconnect = partner closed their connection ─────────
+    // Fires when User1 clicks "Next" — User2's frozen frame clears immediately
+    peerConnection.oniceconnectionstatechange = () => {
+      const state = peerConnection.iceConnectionState
+      if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        setHasStream(false)
+        setRemoteVideoOn(false)
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
+      }
+    }
+
+    return () => {
+      peerConnection.ontrack = null
+      peerConnection.oniceconnectionstatechange = null
+    }
   }, [peerConnection])
 
-  // ── Auto-resume if the browser pauses the video element ──────
-  // Background-tab throttling or a brief network hiccup can cause the
-  // <video> element to pause.  Resume it immediately so the remote
-  // stream keeps playing for the local user.
+  // ── Socket: partner toggled their camera on/off ───────────────
+  // Primary signal for camera toggle (more reliable than track events)
+  useEffect(() => {
+    if (!socket) return
+    const on  = () => setRemoteVideoOn(true)
+    const off = () => {
+      setRemoteVideoOn(false)
+      // Explicitly clear the video src so the frozen last-frame disappears
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.pause()
+        remoteVideoRef.current.srcObject = remoteVideoRef.current.srcObject  // keep audio
+      }
+    }
+    socket.on('partnerVideoOn',  on)
+    socket.on('partnerVideoOff', off)
+    return () => {
+      socket.off('partnerVideoOn',  on)
+      socket.off('partnerVideoOff', off)
+    }
+  }, [socket])
+
+  // ── Auto-resume if browser throttles/pauses the element ──────
   useEffect(() => {
     const video = remoteVideoRef.current
     if (!video) return
-
-    function resume() {
-      video.play().catch(() => {})
-    }
-
-    // Browser paused the element (e.g. tab hidden, low power mode)
+    const resume = () => video.play().catch(() => {})
     video.addEventListener('pause',   resume)
-    // Stream stalled — no new data arrived for a moment
     video.addEventListener('stalled', resume)
-    // Media playback was suspended by the browser
     video.addEventListener('suspend', resume)
-
     return () => {
       video.removeEventListener('pause',   resume)
       video.removeEventListener('stalled', resume)
@@ -47,31 +95,44 @@ export default function RemoteVideo({ remoteVideoRef, peerConnection }) {
     }
   }, [])
 
-  // ── Restore playback when the user comes back to the tab ─────
+  // ── Restore on tab focus ──────────────────────────────────────
   useEffect(() => {
     const video = remoteVideoRef.current
-    function onVisibilityChange() {
+    function onVisible() {
       if (document.hidden || !video) return
-      // If the element was paused while the tab was hidden, un-pause it
       if (video.paused) video.play().catch(() => {})
     }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
+
+  // Decide what to display
+  const showVideo       = hasStream && remoteVideoOn
+  const showAudioOnly   = hasStream && !remoteVideoOn   // connected but camera off
+  const showWaiting     = !hasStream                    // not yet matched
 
   return (
     <div className="video-slot">
-      {!hasStream && (
+      {/* Placeholder — shown when waiting OR when partner disabled camera */}
+      {!showVideo && (
         <div className="video-ph">
-          <div className="video-ph-ico">👥</div>
-          <span>Waiting for match…</span>
+          <div className="video-ph-ico">
+            {showAudioOnly ? '🎙️' : '👥'}
+          </div>
+          <span>
+            {showAudioOnly ? 'Stranger — audio only' : 'Waiting for match…'}
+          </span>
         </div>
       )}
+
       <video
         ref={remoteVideoRef}
         autoPlay
         playsInline
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: hasStream ? 'block' : 'none' }}
+        style={{
+          width: '100%', height: '100%', objectFit: 'cover',
+          display: showVideo ? 'block' : 'none',
+        }}
       />
       <span className="video-lbl">👥 Stranger</span>
     </div>

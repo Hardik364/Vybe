@@ -1,5 +1,6 @@
 import './globals.css'
 import BgCanvas from '@/components/BgCanvas'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const viewport = {
   width: 'device-width',
@@ -32,6 +33,7 @@ export default function RootLayout({ children }) {
       <body>
         <BgCanvas />
         {children}
+        <SpeedInsights />
       </body>
     </html>
   )
